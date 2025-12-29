@@ -85,6 +85,7 @@ omit = [
     "*/.venv/*",
     "*/compute_server.py",  # CLI entry point, not tested
     "*/compute_worker.py",  # CLI entry point, not tested
+    "*/migrate.py",  # Migration utility script, not tested
 ]
 
 [tool.coverage.report]
