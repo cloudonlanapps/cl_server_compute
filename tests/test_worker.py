@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from compute.worker import ComputeWorker, shutdown_event, signal_handler
+from compute.worker import ComputeWorker, reset_shutdown_state, shutdown_event, signal_handler
 
 
 class TestSignalHandler:
@@ -15,8 +15,8 @@ class TestSignalHandler:
 
     def test_signal_handler_sets_shutdown_event(self):
         """Test that signal handler sets shutdown event."""
-        # Reset shutdown event
-        shutdown_event.clear()
+        # Reset shutdown state
+        reset_shutdown_state()
 
         # Call signal handler
         signal_handler(signal.SIGTERM, None)
@@ -26,25 +26,38 @@ class TestSignalHandler:
 
     def test_signal_handler_with_different_signals(self):
         """Test signal handler with different signal numbers."""
-        shutdown_event.clear()
+        reset_shutdown_state()
 
         signal_handler(signal.SIGINT, None)
         assert shutdown_event.is_set()
 
-        shutdown_event.clear()
+        reset_shutdown_state()
         signal_handler(signal.SIGTERM, None)
         assert shutdown_event.is_set()
+
+    def test_signal_handler_second_signal_exits(self):
+        """Test that second signal forces immediate exit."""
+        reset_shutdown_state()
+
+        # First signal should set shutdown event
+        signal_handler(signal.SIGINT, None)
+        assert shutdown_event.is_set()
+
+        # Second signal should exit
+        with pytest.raises(SystemExit) as exc_info:
+            signal_handler(signal.SIGINT, None)
+        assert exc_info.value.code == 1
 
 
 class TestComputeWorker:
     """Tests for ComputeWorker class."""
 
     @pytest.fixture(autouse=True)
-    def reset_shutdown_event(self):
-        """Reset shutdown event before each test."""
-        shutdown_event.clear()
+    def reset_shutdown_state_fixture(self):
+        """Reset shutdown state before and after each test."""
+        reset_shutdown_state()
         yield
-        shutdown_event.clear()
+        reset_shutdown_state()
 
     @pytest.fixture
     def mock_dependencies(self) -> Generator[dict[str, MagicMock | AsyncMock], None, None]:
@@ -232,6 +245,7 @@ class TestComputeWorker:
         # Should be marked idle after processing
         assert worker.capability_broadcaster.is_idle is True
 
+    @pytest.mark.timeout(2)
     async def test_run_worker_loop(self, mock_dependencies: dict[str, MagicMock | AsyncMock]):
         """Test main worker run loop."""
         mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=False)
@@ -262,7 +276,7 @@ class TestComputeWorker:
         """Test worker loop processes jobs."""
         call_count = 0
 
-        async def run_once_side_effect(_: list[str]):
+        async def run_once_side_effect(task_types: list[str]):
             nonlocal call_count
             call_count += 1
             if call_count >= 2:
@@ -280,6 +294,7 @@ class TestComputeWorker:
 
         assert call_count >= 2
 
+    @pytest.mark.timeout(2)
     async def test_run_worker_loop_handles_cancelled_error(
         self, mock_dependencies: dict[str, MagicMock | AsyncMock]
     ):
@@ -298,13 +313,14 @@ class TestComputeWorker:
         # Should complete gracefully
         worker.capability_broadcaster.clear.assert_called_once()
 
+    @pytest.mark.timeout(2)
     async def test_run_worker_loop_handles_general_exception(
         self, mock_dependencies: dict[str, MagicMock | AsyncMock]
     ):
         """Test worker loop handles general exceptions."""
         call_count = 0
 
-        async def run_once_side_effect(_: list[str]):
+        async def run_once_side_effect(task_types: list[str]):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -325,6 +341,7 @@ class TestComputeWorker:
         # Should continue after exception
         assert call_count >= 2
 
+    @pytest.mark.timeout(2)
     async def test_run_worker_classmethod(
         self, mock_dependencies: dict[str, MagicMock | AsyncMock]
     ):
@@ -356,6 +373,7 @@ class TestComputeWorker:
             # Verify broadcaster shutdown was called
             mock_shutdown.assert_called_once()
 
+    @pytest.mark.timeout(2)
     async def test_run_worker_classmethod_with_no_tasks(
         self, mock_dependencies: dict[str, MagicMock | AsyncMock]
     ):

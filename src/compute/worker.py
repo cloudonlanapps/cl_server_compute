@@ -29,6 +29,17 @@ shutdown_event = asyncio.Event()
 shutdown_signal_count = 0
 
 
+def reset_shutdown_state() -> None:
+    """Reset shutdown state for testing.
+
+    This function is used by tests to reset the global shutdown state
+    between test runs.
+    """
+    global shutdown_signal_count
+    shutdown_event.clear()
+    shutdown_signal_count = 0
+
+
 def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals (SIGINT, SIGTERM).
 
