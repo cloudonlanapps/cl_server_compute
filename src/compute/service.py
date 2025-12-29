@@ -89,6 +89,69 @@ class JobService:
         # Use repository to delete job (handles QueueEntry cascade)
         _ = self.repository.delete_job(job_id)
 
+    def get_job_file(self, job_id: str, file_path: str) -> Path:
+        """Get file from job's output directory.
+
+        Args:
+            job_id: Unique job identifier
+            file_path: Relative file path within job directory
+
+        Returns:
+            Absolute path to the requested file
+
+        Raises:
+            HTTPException: If job not found, file not found, or path traversal detected
+        """
+        # Verify job exists
+        library_job = self.repository.get_job(job_id)
+        if not library_job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
+            )
+
+        # Get job directory
+        job_dir = self.storage_base / "jobs" / job_id
+
+        if not job_dir.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job directory not found for job {job_id}",
+            )
+
+        # Resolve requested file path (prevent directory traversal)
+        try:
+            requested_file = (job_dir / file_path).resolve()
+        except (ValueError, OSError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {e}",
+            )
+
+        # Security check: ensure resolved path is within job directory
+        try:
+            _ = requested_file.relative_to(job_dir.resolve())
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: path traversal detected",
+            )
+
+        # Check file exists
+        if not requested_file.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {file_path}",
+            )
+
+        # Check it's a file, not a directory
+        if not requested_file.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path is not a file: {file_path}",
+            )
+
+        return requested_file
+
     def get_storage_size(self) -> StorageInfo:
         """Get total storage usage for all jobs.
 

@@ -1,6 +1,7 @@
 """Compute job management routes."""
 
 from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .auth import UserPayload, require_admin, require_permission
@@ -48,6 +49,48 @@ async def delete_job(
     job_service = JobService(db)
     job_service.delete_job(job_id)
     # No return statement - FastAPI will return 204 automatically
+
+
+@router.get(
+    "/jobs/{job_id}/files/{file_path:path}",
+    tags=["job"],
+    summary="Download Job Output File",
+    description="Download a file from job's output directory using relative path from task_output.",
+    operation_id="get_job_file",
+    response_class=FileResponse,
+)
+async def get_job_file(
+    job_id: str = Path(..., title="Job ID"),
+    file_path: str = Path(..., title="Relative file path within job directory"),
+    db: Session = Depends(get_db),
+    user: UserPayload | None = Depends(require_permission("ai_inference_support")),
+) -> FileResponse:
+    """Download file from job's output directory.
+
+    Args:
+        job_id: Job UUID
+        file_path: Relative file path from task_output (e.g., "output/thumbnail.jpg")
+        db: Database session
+        user: Authenticated user
+
+    Returns:
+        File content with appropriate Content-Type
+
+    Raises:
+        404: Job or file not found
+        403: Path traversal attempt detected
+        400: Invalid file path or path is a directory
+    """
+    _ = user
+    job_service = JobService(db)
+    file_absolute_path = job_service.get_job_file(job_id, file_path)
+
+    # Return file with FileResponse (FastAPI automatically sets Content-Type)
+    return FileResponse(
+        path=file_absolute_path,
+        filename=file_absolute_path.name,
+        media_type="application/octet-stream",  # Let browser determine type
+    )
 
 
 @router.get(
