@@ -1,0 +1,115 @@
+[project]
+name = "task-server"
+version = "0.1.0"
+description = "Task and compute job management microservice"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    {name = "Ananda Sarangaram"}
+]
+keywords = ["tasks", "compute", "jobs", "fastapi", "worker"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "alembic>=1.17.2",
+    "basedpyright>=1.36.2",
+    "cl-ml-tools",
+    "cl-server-shared",
+    "fastapi>=0.127.0",
+    "pydantic>=2.12.5",
+    "python-jose[cryptography]>=3.5.0",
+    "sqlalchemy>=2.0.45",
+    "uvicorn>=0.40.0",
+]
+
+[project.scripts]
+task-server = "task_server.main:main"
+task-worker = "task_server.worker:main"
+
+[tool.uv.sources]
+cl-ml-tools = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git" }
+cl-server-shared = { git = "https://github.com/cloudonlanapps/cl_server_shared.git" }
+
+# Plugin Registration
+# Compute task plugins are auto-discovered from entry points.
+# cl_ml_tools package provides built-in plugins. To add custom plugins,
+# register them here:
+#
+# [project.entry-points."cl_ml_tools.tasks"]
+# my_custom_task = "my_package.tasks:MyCustomTask"
+#
+# The worker will automatically discover and load all registered plugins.
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-asyncio>=1.3.0",
+]
+all = [
+    "task-server[dev]",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/task_server"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+addopts = "--cov=task_server --cov-report=html --cov-report=term-missing --cov-fail-under=90"
+
+[tool.coverage.run]
+source = ["src/task_server"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/main.py"  # CLI entry point, not tested
+]
+
+[tool.coverage.report]
+precision = 2
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "F811", "F401", "UP",
+    "F841",  # local variable assigned but never used
+    "B018",  # useless expression
+  ]
+ignore = ["E501"]

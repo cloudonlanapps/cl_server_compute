@@ -1,0 +1,9 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingTypeStubs": true,
+  "ignore": [],
+  "include": ["src"],
+  "reportCallInDefaultInitializer": "none",
+  "extraPaths": ["src"],
+}

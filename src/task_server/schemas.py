@@ -1,0 +1,44 @@
+"""Compute job response schemas."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+# Type alias for JSON-serializable values (params and task_output are arbitrary JSON)
+JsonDict = dict[str, object]
+
+
+class JobResponse(BaseModel):
+    """Response schema for job information.
+
+    Contains job status, parameters, and output with service-specific fields
+    for timestamps and priority.
+    """
+
+    job_id: str = Field(..., description="Unique job identifier")
+    task_type: str = Field(..., description="Type of task to execute")
+    status: str = Field(..., description="Job status (queued, in_progress, completed, failed)")
+    progress: int = Field(0, description="Progress percentage (0-100)")
+    params: JsonDict = Field(default_factory=dict, description="Task parameters")
+    task_output: JsonDict | None = Field(None, description="Task output/results")
+    error_message: str | None = Field(None, description="Error message if job failed")
+
+    priority: int = Field(5, description="Job priority (0-10)")
+    created_at: int = Field(..., description="Job creation timestamp (milliseconds)")
+    updated_at: int | None = Field(None, description="Job last update timestamp (milliseconds)")
+    started_at: int | None = Field(None, description="Job start timestamp (milliseconds)")
+    completed_at: int | None = Field(None, description="Job completion timestamp (milliseconds)")
+
+
+class StorageInfo(BaseModel):
+    """Response schema for storage information."""
+
+    total_size: int = Field(..., description="Total storage usage in bytes")
+    job_count: int = Field(..., description="Number of jobs stored")
+
+
+class CleanupResult(BaseModel):
+    """Response schema for cleanup operation results."""
+
+    deleted_count: int = Field(..., description="Number of jobs deleted")
+    freed_space: int = Field(..., description="Space freed in bytes")
