@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-# Type alias for JSON-serializable values (params and task_output are arbitrary JSON)
-JsonDict = dict[str, object]
+type JSONPrimitive = str | int | float | bool | None
+type JSONValue = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]
+type JSONObject = dict[str, JSONValue]
 
 
 class JobResponse(BaseModel):
@@ -19,8 +20,8 @@ class JobResponse(BaseModel):
     task_type: str = Field(..., description="Type of task to execute")
     status: str = Field(..., description="Job status (queued, in_progress, completed, failed)")
     progress: int = Field(0, description="Progress percentage (0-100)")
-    params: JsonDict = Field(default_factory=dict, description="Task parameters")
-    task_output: JsonDict | None = Field(None, description="Task output/results")
+    params: JSONObject = Field(default_factory=dict, description="Task parameters")
+    task_output: JSONObject | None = Field(None, description="Task output/results")
     error_message: str | None = Field(None, description="Error message if job failed")
 
     priority: int = Field(5, description="Job priority (0-10)")

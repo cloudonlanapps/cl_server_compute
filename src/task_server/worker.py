@@ -10,23 +10,43 @@ This worker:
 
 from __future__ import annotations
 
-import argparse
 import asyncio
-import json
 import logging
 import signal
 import sys
-import time
+from argparse import ArgumentParser, Namespace
 from types import FrameType
-from typing import Any
 
-from cl_ml_tools import Worker, get_broadcaster, shutdown_broadcaster
+from cl_ml_tools import (
+    Worker,
+    shutdown_broadcaster,
+)
 from cl_server_shared import Config, JobStorageService
 from cl_server_shared.shared_db import JobRepositoryService
 
+from .capability_broadcaster import CapabilityBroadcaster
 from .database import SessionLocal
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("task_server")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+
+class Args(Namespace):
+    worker_id: str = Config.WORKER_ID
+    tasks: str | None = None
+    log_level: str = Config.LOG_LEVEL
+
+    def __init__(
+        self,
+        worker_id: str = Config.WORKER_ID,
+        tasks: str | None = None,
+        log_level: str = Config.LOG_LEVEL,
+    ) -> None:
+        super().__init__()
+        self.worker_id = worker_id
+        self.tasks = tasks
+        self.log_level = log_level
+
 
 # Global shutdown event
 shutdown_event = asyncio.Event()
@@ -36,68 +56,6 @@ def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals (SIGINT, SIGTERM)."""
     logger.info(f"Received signal {signum}, initiating graceful shutdown...")
     shutdown_event.set()
-
-
-class CapabilityBroadcaster:
-    """Manages MQTT broadcasting of worker capabilities for service discovery."""
-
-    def __init__(self, worker_id: str, active_tasks: set[str]):
-        """Initialize capability broadcaster.
-
-        Args:
-            worker_id: Unique identifier for this worker
-            active_tasks: Set of task types this worker can execute
-        """
-        self.worker_id: str = worker_id
-        self.active_tasks: set[str] = active_tasks
-        self.is_idle: bool = True
-        self.broadcaster: Any = None  # Type from cl_ml_tools (not exported)
-        self.topic: str = f"{Config.CAPABILITY_TOPIC_PREFIX}/{worker_id}"
-
-    def init(self):
-        """Initialize MQTT broadcaster and set Last Will & Testament."""
-        self.broadcaster = get_broadcaster(
-            broadcast_type=Config.BROADCAST_TYPE,
-            broker=Config.MQTT_BROKER,
-            port=Config.MQTT_PORT,
-        )
-
-        # Set Last Will & Testament (LWT) - published when worker disconnects
-        if self.broadcaster:
-            _ = self.broadcaster.set_will(topic=self.topic, payload="", qos=1, retain=True)
-            logger.info(f"MQTT broadcaster initialized for worker {self.worker_id}")
-
-    def publish(self):
-        """Publish current worker capabilities to MQTT."""
-        if not self.broadcaster:
-            logger.warning("MQTT broadcaster not initialized, skipping capability publish")
-            return
-
-        capabilities_msg = {
-            "id": self.worker_id,
-            "capabilities": list(self.active_tasks),
-            "idle_count": 1 if self.is_idle else 0,
-            "timestamp": int(time.time() * 1000),
-        }
-
-        payload = json.dumps(capabilities_msg)
-        success = self.broadcaster.publish_retained(topic=self.topic, payload=payload, qos=1)
-
-        if success:
-            logger.debug(f"Published capabilities: {list(self.active_tasks)}, idle: {self.is_idle}")
-        else:
-            logger.error(f"Failed to publish capabilities to {self.topic}")
-
-    def clear(self):
-        """Clear retained worker capabilities from MQTT (on shutdown)."""
-        if not self.broadcaster:
-            return
-
-        success = self.broadcaster.clear_retained(self.topic)
-        if success:
-            logger.info(f"Cleared retained capabilities from {self.topic}")
-        else:
-            logger.error(f"Failed to clear retained capabilities from {self.topic}")
 
 
 class ComputeWorker:
@@ -156,12 +114,12 @@ class ComputeWorker:
             if requested_tasks and not available_tasks:
                 raise RuntimeError(
                     "No compute plugins found! Ensure cl_ml_tools is installed with "
-                    "task plugins registered in pyproject.toml"
+                    + "task plugins registered in pyproject.toml"
                 )
             elif requested_tasks and available_tasks:
                 raise RuntimeError(
                     f"No matching plugins found. Requested: {sorted(requested_tasks)}, "
-                    f"Available: {sorted(available_tasks)}"
+                    + f"Available: {sorted(available_tasks)}"
                 )
             else:
                 raise RuntimeError("No task types specified")
@@ -279,7 +237,7 @@ async def run_worker(worker_id: str, tasks: list[str] | None):
 
 def main() -> int:
     """CLI entry point for worker."""
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         prog="task-worker",
         description="Compute worker for task execution",
     )
@@ -303,14 +261,7 @@ def main() -> int:
         help=f"Logging level (default: {Config.LOG_LEVEL})",
     )
 
-    args = parser.parse_args()
-
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    logger.setLevel(getattr(logging, args.log_level))
+    args = parser.parse_args(namespace=Args())
 
     # Parse tasks
     tasks = args.tasks.split(",") if args.tasks else None

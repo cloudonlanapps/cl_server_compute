@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from cl_server_shared import Config, JobStorageService
@@ -38,13 +37,13 @@ class JobService:
         """Get job status and results.
 
         Args:
-            job_id: Unique job identifier
+             job_id: Unique job identifier
 
-        Returns:
-            JobResponse with job details
+         Returns:
+             JobResponse with job details
 
-        Raises:
-            ValueError: If job not found
+         Raises:
+             ValueError: If job not found
         """
         # Get additional metadata from database
         db_job = self.db.query(Job).filter_by(job_id=job_id).first()
@@ -52,39 +51,19 @@ class JobService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
             )
-        library_job = db_job
-
-        # Parse task_output if it's a JSON string
-        task_output_raw = getattr(library_job, "task_output", None)
-        task_output: dict[str, object] | None = None
-        if task_output_raw:
-            if isinstance(task_output_raw, str):
-                task_output = json.loads(task_output_raw)
-            else:
-                task_output = task_output_raw
-
-        # Parse params from JSON if needed
-        # Note: library_job.params is dict[str, JSONValue] which is compatible at runtime
-        params_dict: dict[str, object]
-        if isinstance(library_job.params, str):
-            params_dict = json.loads(library_job.params)
-        else:
-            params_dict = library_job.params  # pyright: ignore[reportAssignmentType]
 
         return JobResponse(
-            job_id=library_job.job_id,
-            task_type=library_job.task_type,
-            status=library_job.status,
-            progress=library_job.progress,
-            params=params_dict,
-            task_output=task_output,
+            job_id=db_job.job_id,
+            task_type=db_job.task_type,
+            status=db_job.status,
+            progress=db_job.progress,
+            params=db_job.params,
+            task_output=db_job.output,
             created_at=db_job.created_at,
             updated_at=db_job.created_at,
             started_at=db_job.started_at,
             completed_at=db_job.completed_at,
-            error_message=library_job.error_message
-            if hasattr(library_job, "error_message")
-            else None,
+            error_message=db_job.error_message if hasattr(db_job, "error_message") else None,
             priority=db_job.priority,
         )
 
@@ -169,7 +148,7 @@ class JobService:
                         deleted_count += 1
 
         # Remove cleaned up jobs from database using repository
-        current_time_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        current_time_ms = int(datetime.now(UTC).timestamp() * 1000)
         cutoff_time_ms = current_time_ms - (days * 24 * 60 * 60 * 1000)
 
         old_jobs = self.db.query(Job).filter(Job.created_at < cutoff_time_ms).all()
