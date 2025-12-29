@@ -1,4 +1,4 @@
-# src/task_server/main.py
+# src/compute/compute_server.py
 from __future__ import annotations
 
 import logging
@@ -8,7 +8,7 @@ from argparse import ArgumentParser, Namespace
 
 import uvicorn
 
-logger = logging.getLogger("task_server")
+logger = logging.getLogger("compute")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
@@ -39,7 +39,7 @@ class Args(Namespace):
 
 
 def main() -> int:
-    parser = ArgumentParser(prog="task-server")
+    parser = ArgumentParser(prog="compute-server")
     _ = parser.add_argument("--no-auth", action="store_true", help="Disable authentication")
     _ = parser.add_argument("--port", "-p", type=int, default=int(os.getenv("PORT", "8002")))
     _ = parser.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"))
@@ -55,7 +55,7 @@ def main() -> int:
     try:
         # Pass app as import string for reload to work
         uvicorn.run(
-            "task_server.task_server:app",
+            "compute.task_server:app",
             host=args.host,
             port=args.port,
             reload=args.reload,

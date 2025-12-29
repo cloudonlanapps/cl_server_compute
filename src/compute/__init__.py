@@ -14,7 +14,7 @@ from .capability_manager import close_capability_manager, get_capability_manager
 from .models import Job, QueueEntry
 from .plugins import create_compute_plugin_router
 from .schemas import CleanupResult, JobResponse, StorageInfo
-from .worker import ComputeWorker, run_worker
+from .worker import ComputeWorker
 
 __all__ = [
     "Job",
@@ -26,5 +26,4 @@ __all__ = [
     "get_capability_manager",
     "close_capability_manager",
     "ComputeWorker",
-    "run_worker",
 ]

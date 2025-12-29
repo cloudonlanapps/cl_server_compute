@@ -1,10 +1,10 @@
-# Task Server
+# Compute
 
 Task and compute job management microservice for the CL Server platform.
 
 ## Overview
 
-Task Server provides REST API endpoints for:
+Compute provides REST API endpoints for:
 - Job lifecycle management (retrieve, delete)
 - Worker capability discovery
 - Compute task execution via plugin system
@@ -26,16 +26,16 @@ uv sync --all-extras
 
 ```bash
 # Run with default settings (port 8002)
-uv run task-server
+uv run compute-server
 
 # Run with custom port
-uv run task-server --port 8003
+uv run compute-server --port 8003
 
 # Run with auto-reload for development
-uv run task-server --reload
+uv run compute-server --reload
 
 # Disable authentication (dev/testing only)
-uv run task-server --no-auth
+uv run compute-server --no-auth
 ```
 
 ### Running the Worker
@@ -44,20 +44,20 @@ The worker executes compute tasks by polling the job queue and processing them u
 
 ```bash
 # Run worker with default settings
-uv run task-worker
+uv run compute-worker
 
 # Run with custom worker ID
-uv run task-worker --worker-id worker-1
+uv run compute-worker --worker-id worker-1
 
 # Run with specific task types
-uv run task-worker --tasks clip_embedding,face_detection
+uv run compute-worker --tasks clip_embedding,face_detection
 
 # Run with debug logging
-uv run task-worker --log-level DEBUG
+uv run compute-worker --log-level DEBUG
 
 # Example: Multiple workers for scalability
-uv run task-worker --worker-id worker-1 &
-uv run task-worker --worker-id worker-2 &
+uv run compute-worker --worker-id worker-1 &
+uv run compute-worker --worker-id worker-2 &
 ```
 
 ## Environment Variables

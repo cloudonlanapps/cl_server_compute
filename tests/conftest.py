@@ -1,4 +1,4 @@
-"""Shared test fixtures for task_server."""
+"""Shared test fixtures for compute."""
 
 import pytest
 from sqlalchemy import create_engine

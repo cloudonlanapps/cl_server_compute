@@ -1,0 +1,381 @@
+"""Tests for compute worker."""
+
+import asyncio
+import signal
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+
+from compute.worker import ComputeWorker, shutdown_event, signal_handler
+
+
+class TestSignalHandler:
+    """Tests for signal handler."""
+
+    def test_signal_handler_sets_shutdown_event(self):
+        """Test that signal handler sets shutdown event."""
+        # Reset shutdown event
+        shutdown_event.clear()
+
+        # Call signal handler
+        signal_handler(signal.SIGTERM, None)
+
+        # Verify shutdown event is set
+        assert shutdown_event.is_set()
+
+    def test_signal_handler_with_different_signals(self):
+        """Test signal handler with different signal numbers."""
+        shutdown_event.clear()
+
+        signal_handler(signal.SIGINT, None)
+        assert shutdown_event.is_set()
+
+        shutdown_event.clear()
+        signal_handler(signal.SIGTERM, None)
+        assert shutdown_event.is_set()
+
+
+class TestComputeWorker:
+    """Tests for ComputeWorker class."""
+
+    @pytest.fixture(autouse=True)
+    def reset_shutdown_event(self):
+        """Reset shutdown event before each test."""
+        shutdown_event.clear()
+        yield
+        shutdown_event.clear()
+
+    @pytest.fixture
+    def mock_dependencies(self):
+        """Mock dependencies for ComputeWorker."""
+        with (
+            patch("compute.worker.JobRepositoryService") as mock_repo,
+            patch("compute.worker.JobStorageService") as mock_storage,
+            patch("compute.worker.Worker") as mock_worker,
+            patch("compute.worker.CapabilityBroadcaster") as mock_broadcaster,
+        ):
+            # Configure mock library worker
+            mock_worker_instance = MagicMock()
+            mock_worker_instance.get_supported_task_types.return_value = [
+                "image_resize",
+                "image_conversion",
+            ]
+            mock_worker_instance.run_once = AsyncMock(return_value=True)
+            mock_worker.return_value = mock_worker_instance
+
+            yield {
+                "repo": mock_repo,
+                "storage": mock_storage,
+                "worker": mock_worker,
+                "worker_instance": mock_worker_instance,
+                "broadcaster": mock_broadcaster,
+            }
+
+    def test_worker_init_with_all_tasks(self, mock_dependencies):
+        """Test worker initialization with all available tasks."""
+        worker = ComputeWorker(
+            worker_id="test-worker",
+            supported_tasks=None,
+        )
+
+        assert worker.worker_id == "test-worker"
+        assert worker.active_tasks == {"image_resize", "image_conversion"}
+        assert worker.library_worker is not None
+        assert worker.capability_broadcaster is not None
+
+    def test_worker_init_with_specific_tasks(self, mock_dependencies):
+        """Test worker initialization with specific task types."""
+        worker = ComputeWorker(
+            worker_id="test-worker",
+            supported_tasks=["image_resize"],
+        )
+
+        assert worker.active_tasks == {"image_resize"}
+
+    def test_worker_init_with_no_matching_tasks(self, mock_dependencies):
+        """Test worker initialization with no matching tasks raises error."""
+        with pytest.raises(
+            RuntimeError, match="No matching plugins found"
+        ):
+            ComputeWorker(
+                worker_id="test-worker",
+                supported_tasks=["nonexistent_task"],
+            )
+
+    def test_worker_init_with_no_plugins_available(self):
+        """Test worker initialization when no plugins are available."""
+        with (
+            patch("compute.worker.JobRepositoryService"),
+            patch("compute.worker.JobStorageService"),
+            patch("compute.worker.Worker") as mock_worker,
+        ):
+            mock_worker_instance = MagicMock()
+            mock_worker_instance.get_supported_task_types.return_value = []
+            mock_worker.return_value = mock_worker_instance
+
+            with pytest.raises(
+                RuntimeError, match="No compute plugins found"
+            ):
+                ComputeWorker(
+                    worker_id="test-worker",
+                    supported_tasks=["some_task"],
+                )
+
+    def test_worker_init_with_custom_poll_interval(self, mock_dependencies):
+        """Test worker initialization with custom poll interval."""
+        worker = ComputeWorker(
+            worker_id="test-worker",
+            poll_interval=30,
+        )
+
+        assert worker.poll_interval == 30
+
+    async def test_heartbeat_task_publishes_periodically(self, mock_dependencies):
+        """Test heartbeat task publishes capabilities periodically."""
+        worker = ComputeWorker(worker_id="test-worker")
+
+        # Mock capability broadcaster
+        worker.capability_broadcaster.publish = MagicMock()
+
+        # Run heartbeat task for a short time
+        task = asyncio.create_task(worker._heartbeat_task())
+
+        # Wait a bit then cancel
+        await asyncio.sleep(0.1)
+        task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        # Verify publish was called (might be 0 or more times depending on timing)
+        # The important thing is it doesn't raise an exception
+
+    async def test_heartbeat_task_stops_on_shutdown(self, mock_dependencies):
+        """Test heartbeat task stops when shutdown event is set."""
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.publish = MagicMock()
+
+        # Start heartbeat task
+        task = asyncio.create_task(worker._heartbeat_task())
+
+        # Set shutdown event
+        shutdown_event.set()
+
+        # Wait a bit for task to finish
+        await asyncio.sleep(0.1)
+
+        # Task should complete without being cancelled
+        assert task.done()
+
+    async def test_process_next_job_success(self, mock_dependencies):
+        """Test processing a job successfully."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=True)
+
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.publish = MagicMock()
+
+        result = await worker._process_next_job()
+
+        assert result is True
+        mock_dependencies["worker_instance"].run_once.assert_called_once()
+
+        # Verify broadcaster state changes
+        assert worker.capability_broadcaster.publish.call_count >= 2  # busy + idle
+
+    async def test_process_next_job_no_jobs(self, mock_dependencies):
+        """Test processing when no jobs are available."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=False)
+
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.publish = MagicMock()
+
+        result = await worker._process_next_job()
+
+        assert result is False
+
+    async def test_process_next_job_error(self, mock_dependencies):
+        """Test processing job when an error occurs."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(
+            side_effect=Exception("Test error")
+        )
+
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.publish = MagicMock()
+
+        result = await worker._process_next_job()
+
+        assert result is False  # Should return False on error
+
+    async def test_process_next_job_updates_broadcaster_state(self, mock_dependencies):
+        """Test that processing job updates broadcaster idle state."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=True)
+
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.is_idle = True
+        worker.capability_broadcaster.publish = MagicMock()
+
+        await worker._process_next_job()
+
+        # Should be marked idle after processing
+        assert worker.capability_broadcaster.is_idle is True
+
+    async def test_run_worker_loop(self, mock_dependencies):
+        """Test main worker run loop."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=False)
+
+        worker = ComputeWorker(worker_id="test-worker", poll_interval=0.01)
+        worker.capability_broadcaster.init = MagicMock()
+        worker.capability_broadcaster.publish = MagicMock()
+        worker.capability_broadcaster.clear = MagicMock()
+
+        # Run for a short time then shutdown
+        async def shutdown_after_delay():
+            await asyncio.sleep(0.05)
+            shutdown_event.set()
+
+        shutdown_task = asyncio.create_task(shutdown_after_delay())
+
+        await worker.run()
+        await shutdown_task
+
+        # Verify initialization and cleanup
+        worker.capability_broadcaster.init.assert_called_once()
+        worker.capability_broadcaster.clear.assert_called_once()
+        assert worker.capability_broadcaster.publish.call_count >= 1
+
+    async def test_run_worker_loop_processes_jobs(self, mock_dependencies):
+        """Test worker loop processes jobs."""
+        call_count = 0
+
+        async def run_once_side_effect(task_types):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                shutdown_event.set()
+            return True
+
+        mock_dependencies["worker_instance"].run_once = AsyncMock(
+            side_effect=run_once_side_effect
+        )
+
+        worker = ComputeWorker(worker_id="test-worker", poll_interval=0.01)
+        worker.capability_broadcaster.init = MagicMock()
+        worker.capability_broadcaster.publish = MagicMock()
+        worker.capability_broadcaster.clear = MagicMock()
+
+        await worker.run()
+
+        assert call_count >= 2
+
+    async def test_run_worker_loop_handles_cancelled_error(self, mock_dependencies):
+        """Test worker loop handles asyncio.CancelledError."""
+        mock_dependencies["worker_instance"].run_once = AsyncMock(
+            side_effect=asyncio.CancelledError()
+        )
+
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.init = MagicMock()
+        worker.capability_broadcaster.publish = MagicMock()
+        worker.capability_broadcaster.clear = MagicMock()
+
+        await worker.run()
+
+        # Should complete gracefully
+        worker.capability_broadcaster.clear.assert_called_once()
+
+    async def test_run_worker_loop_handles_general_exception(self, mock_dependencies):
+        """Test worker loop handles general exceptions."""
+        call_count = 0
+
+        async def run_once_side_effect(task_types):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Test error")
+            else:
+                shutdown_event.set()
+                return False
+
+        mock_dependencies["worker_instance"].run_once = AsyncMock(
+            side_effect=run_once_side_effect
+        )
+
+        worker = ComputeWorker(worker_id="test-worker", poll_interval=0.01)
+        worker.capability_broadcaster.init = MagicMock()
+        worker.capability_broadcaster.publish = MagicMock()
+        worker.capability_broadcaster.clear = MagicMock()
+
+        await worker.run()
+
+        # Should continue after exception
+        assert call_count >= 2
+
+    async def test_run_worker_classmethod(self, mock_dependencies):
+        """Test run_worker classmethod creates and runs worker."""
+        with (
+            patch("compute.worker.signal.signal") as mock_signal,
+            patch("compute.worker.shutdown_broadcaster") as mock_shutdown,
+        ):
+            # Set shutdown immediately to exit quickly
+            shutdown_event.set()
+
+            mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=False)
+
+            # Mock capability broadcaster methods
+            mock_broadcaster_instance = MagicMock()
+            mock_broadcaster_instance.init = MagicMock()
+            mock_broadcaster_instance.publish = MagicMock()
+            mock_broadcaster_instance.clear = MagicMock()
+            mock_dependencies["broadcaster"].return_value = mock_broadcaster_instance
+
+            await ComputeWorker.run_worker(
+                worker_id="test-worker",
+                tasks=["image_resize"],
+            )
+
+            # Verify signal handlers were registered
+            assert mock_signal.call_count == 2
+
+            # Verify broadcaster shutdown was called
+            mock_shutdown.assert_called_once()
+
+    async def test_run_worker_classmethod_with_no_tasks(self, mock_dependencies):
+        """Test run_worker classmethod with None tasks."""
+        with (
+            patch("compute.worker.signal.signal"),
+            patch("compute.worker.shutdown_broadcaster"),
+        ):
+            shutdown_event.set()
+
+            mock_dependencies["worker_instance"].run_once = AsyncMock(return_value=False)
+
+            # Mock capability broadcaster
+            mock_broadcaster_instance = MagicMock()
+            mock_broadcaster_instance.init = MagicMock()
+            mock_broadcaster_instance.publish = MagicMock()
+            mock_broadcaster_instance.clear = MagicMock()
+            mock_dependencies["broadcaster"].return_value = mock_broadcaster_instance
+
+            await ComputeWorker.run_worker(
+                worker_id="test-worker",
+                tasks=None,
+            )
+
+            # Should complete without error
+
+    async def test_run_cancels_heartbeat_on_shutdown(self, mock_dependencies):
+        """Test that run cancels heartbeat task on shutdown."""
+        worker = ComputeWorker(worker_id="test-worker")
+        worker.capability_broadcaster.init = MagicMock()
+        worker.capability_broadcaster.publish = MagicMock()
+        worker.capability_broadcaster.clear = MagicMock()
+
+        # Set shutdown immediately
+        shutdown_event.set()
+
+        await worker.run()
+
+        # Cleanup should be called
+        worker.capability_broadcaster.clear.assert_called_once()

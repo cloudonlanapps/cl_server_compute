@@ -7,7 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Add parent directory to path to import task_server module
+# Add parent directory to path to import compute module
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cl_server_shared.config import Config as AppConfig

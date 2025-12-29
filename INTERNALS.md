@@ -1,16 +1,16 @@
-# Task Server - Developer Documentation
+# Compute - Developer Documentation
 
 ## Overview
 
-Task Server is a FastAPI microservice that manages compute jobs and worker capabilities. It integrates with the cl_ml_tools plugin system and uses shared infrastructure from cl_server_shared.
+Compute is a FastAPI microservice that manages compute jobs and worker capabilities. It integrates with the cl_ml_tools plugin system and uses shared infrastructure from cl_server_shared.
 
 ## Package Structure
 
 ```
-task_server/
-├── src/task_server/
+compute/
+├── src/compute/
 │   ├── __init__.py           # Public API exports
-│   ├── main.py               # Server CLI entry point
+│   ├── server.py             # Server CLI entry point
 │   ├── worker.py             # Worker CLI entry point
 │   ├── task_server.py        # FastAPI app
 │   ├── routes.py             # API routes

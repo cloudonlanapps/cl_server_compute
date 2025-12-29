@@ -1,6 +1,7 @@
 """Task Server - Compute job and worker management service."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -12,7 +13,18 @@ from .routes import router
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI(title="Task Server", version="v1")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown."""
+    # Startup: nothing to do currently
+    yield
+    # Shutdown: cleanup capability manager
+    from .capability_manager import close_capability_manager
+
+    close_capability_manager()
+
+
+app = FastAPI(title="Task Server", version="v1", lifespan=lifespan)
 
 # Include job management routes
 app.include_router(router)
@@ -49,12 +61,3 @@ class RootResponse(BaseModel):
 )
 async def root():
     return RootResponse(status="healthy", service="Task Server", version="v1")
-
-
-@app.on_event("shutdown")  # pyright: ignore[reportDeprecated]
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    from .capability_manager import close_capability_manager
-
-    # Close capability manager
-    close_capability_manager()

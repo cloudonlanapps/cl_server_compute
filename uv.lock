@@ -207,6 +207,57 @@ wheels = [
 ]
 
 [[package]]
+name = "compute"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "basedpyright" },
+    { name = "cl-ml-tools" },
+    { name = "cl-server-shared" },
+    { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "pytest-cov" },
+    { name = "python-jose", extra = ["cryptography"] },
+    { name = "sqlalchemy" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.17.2" },
+    { name = "basedpyright", specifier = ">=1.36.2" },
+    { name = "cl-ml-tools", git = "https://github.com/cloudonlanapps/cl_ml_tools.git" },
+    { name = "cl-server-shared", git = "https://github.com/cloudonlanapps/cl_server_shared.git" },
+    { name = "compute", extras = ["dev"], marker = "extra == 'all'" },
+    { name = "fastapi", specifier = ">=0.127.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "pytest-cov", extras = ["dev"], specifier = ">=7.0.0" },
+    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.5.0" },
+    { name = "sqlalchemy", specifier = ">=2.0.45" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
+]
+provides-extras = ["dev", "all"]
+
+[[package]]
 name = "coverage"
 version = "7.13.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1241,63 +1292,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5", size = 6299353, upload-time = "2025-04-27T18:04:59.103Z" },
 ]
-
-[[package]]
-name = "task-server"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "basedpyright" },
-    { name = "cl-ml-tools" },
-    { name = "cl-server-shared" },
-    { name = "fastapi" },
-    { name = "pydantic" },
-    { name = "python-jose", extra = ["cryptography"] },
-    { name = "sqlalchemy" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest-asyncio" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.17.2" },
-    { name = "basedpyright", specifier = ">=1.36.2" },
-    { name = "cl-ml-tools", git = "https://github.com/cloudonlanapps/cl_ml_tools.git" },
-    { name = "cl-server-shared", git = "https://github.com/cloudonlanapps/cl_server_shared.git" },
-    { name = "fastapi", specifier = ">=0.127.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.5.0" },
-    { name = "sqlalchemy", specifier = ">=2.0.45" },
-    { name = "task-server", extras = ["dev"], marker = "extra == 'all'" },
-    { name = "uvicorn", specifier = ">=0.40.0" },
-]
-provides-extras = ["dev", "all"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest-asyncio", specifier = ">=1.3.0" }]
 
 [[package]]
 name = "typing-extensions"
