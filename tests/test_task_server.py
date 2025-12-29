@@ -1,10 +1,13 @@
 """Tests for FastAPI application."""
 
+from typing import cast
 from unittest.mock import patch
 
 import pytest
+from fastapi.openapi.models import OpenAPI
 from fastapi.testclient import TestClient
 
+from compute.schemas import RootResponse
 from compute.task_server import app
 
 
@@ -46,22 +49,17 @@ class TestTaskServerApp:
         response = client.get("/")
 
         assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "healthy"
-        assert data["service"] == "Task Server"
-        assert data["version"] == "v1"
+        data = RootResponse.model_validate(response.json())
+        assert data.status == "healthy"
+        assert data.service == "Task Server"
+        assert data.version == "v1"
 
     def test_root_response_schema(self, client: TestClient):
         """Test root endpoint response matches schema."""
         response = client.get("/")
 
-        data = response.json()
-        assert "status" in data
-        assert "service" in data
-        assert "version" in data
-        assert isinstance(data["status"], str)
-        assert isinstance(data["service"], str)
-        assert isinstance(data["version"], str)
+        # validate with Pydantic model
+        _ = RootResponse.model_validate(response.json())
 
     def test_http_exception_handler(self, client: TestClient):
         """Test HTTP exception handler preserves error format."""
@@ -89,8 +87,8 @@ class TestTaskServerApp:
                 response = client.get("/jobs/test-job")
 
                 assert response.status_code == 404
-                data = response.json()
-                assert "detail" in data
+                error_data = cast(dict[str, str], response.json())
+                assert "detail" in error_data
 
                 # Clean up
                 test_db.close()
@@ -127,18 +125,26 @@ class TestTaskServerApp:
         response = client.get("/openapi.json")
 
         assert response.status_code == 200
-        schema = response.json()
+        # Validate with Pydantic model then convert to dict for easier access
+        schema_model = OpenAPI.model_validate(response.json())
+        schema = cast(
+            dict[str, dict[str, str] | dict[str, dict[str, dict[str, str]]]],
+            schema_model.model_dump(),
+        )
         assert "openapi" in schema
         assert "info" in schema
-        assert schema["info"]["title"] == "Task Server"
-        assert schema["info"]["version"] == "v1"
+        info = cast(dict[str, str], schema["info"])
+        assert info["title"] == "Task Server"
+        assert info["version"] == "v1"
 
     def test_openapi_paths_exist(self, client: TestClient):
         """Test that expected paths exist in OpenAPI schema."""
         response = client.get("/openapi.json")
-        schema = response.json()
+        schema_model = OpenAPI.model_validate(response.json())
+        schema = schema_model.model_dump()
 
-        paths = schema["paths"]
+        assert "paths" in schema
+        paths = cast(dict[str, dict[str, dict[str, str]]], schema["paths"])
         assert "/" in paths
         assert "/jobs/{job_id}" in paths
         assert "/capabilities" in paths
@@ -148,31 +154,42 @@ class TestTaskServerApp:
     def test_openapi_operations(self, client: TestClient):
         """Test that operations have correct operation IDs."""
         response = client.get("/openapi.json")
-        schema = response.json()
+        schema_model = OpenAPI.model_validate(response.json())
+        schema = schema_model.model_dump()
+
+        paths = cast(dict[str, dict[str, dict[str, str]]], schema["paths"])
 
         # Check root endpoint
-        assert schema["paths"]["/"]["get"]["operationId"] == "root_get"
+        root_get_op = paths["/"]["get"]
+        assert root_get_op["operationId"] == "root_get"
 
         # Check job endpoints
-        assert schema["paths"]["/jobs/{job_id}"]["get"]["operationId"] == "get_job"
-        assert schema["paths"]["/jobs/{job_id}"]["delete"]["operationId"] == "delete_job"
+        job_get_op = paths["/jobs/{job_id}"]["get"]
+        assert job_get_op["operationId"] == "get_job"
+
+        job_delete_op = paths["/jobs/{job_id}"]["delete"]
+        assert job_delete_op["operationId"] == "delete_job"
 
         # Check capability endpoint
-        assert schema["paths"]["/capabilities"]["get"]["operationId"] == "get_worker_capabilities"
+        cap_get_op = paths["/capabilities"]["get"]
+        assert cap_get_op["operationId"] == "get_worker_capabilities"
 
     def test_app_tags(self, client: TestClient):
         """Test that endpoints are tagged correctly."""
         response = client.get("/openapi.json")
-        schema = response.json()
+        schema_model = OpenAPI.model_validate(response.json())
+        schema = schema_model.model_dump()
+
+        paths = cast(dict[str, dict[str, dict[str, list[str]]]], schema["paths"])
 
         # Job endpoints should have 'job' tag
-        job_get = schema["paths"]["/jobs/{job_id}"]["get"]
-        assert "job" in job_get["tags"]
+        job_get_op = paths["/jobs/{job_id}"]["get"]
+        assert "job" in job_get_op["tags"]
 
         # Admin endpoints should have 'admin' tag
-        storage_get = schema["paths"]["/admin/jobs/storage/size"]["get"]
-        assert "admin" in storage_get["tags"]
+        storage_get_op = paths["/admin/jobs/storage/size"]["get"]
+        assert "admin" in storage_get_op["tags"]
 
         # Capability endpoint should have 'compute' tag
-        cap_get = schema["paths"]["/capabilities"]["get"]
-        assert "compute" in cap_get["tags"]
+        cap_get_op = paths["/capabilities"]["get"]
+        assert "compute" in cap_get_op["tags"]

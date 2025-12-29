@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 type JSONPrimitive = str | int | float | bool | None
 type JSONValue = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]
@@ -43,3 +43,27 @@ class CleanupResult(BaseModel):
 
     deleted_count: int = Field(..., description="Number of jobs deleted")
     freed_space: int = Field(..., description="Space freed in bytes")
+
+
+class CapabilityStats(RootModel[dict[str, int]]):
+    """Aggregated capability statistics.
+
+    Mapping of capability names to counts (e.g. idle count or total worker count).
+    """
+
+    root: dict[str, int]
+
+
+class WorkerCapabilitiesResponse(BaseModel):
+    """Response schema for worker capabilities endpoint."""
+
+    num_workers: int = Field(..., description="Total number of connected workers")
+    capabilities: CapabilityStats = Field(..., description="Available capability counts")
+
+
+class RootResponse(BaseModel):
+    """Response schema for root health check endpoint."""
+
+    status: str = Field(..., description="Health status")
+    service: str = Field(..., description="Service name")
+    version: str = Field(..., description="Service version")

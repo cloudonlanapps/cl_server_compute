@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from .plugins import create_compute_plugin_router
 from .routes import router
+from .schemas import RootResponse
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
     _ = app
-    # Startup: nothing to do currently
+    # Startup: run database migrations
+    from .database import run_migrations
+
+    run_migrations()
+
     yield
     # Shutdown: cleanup capability manager
     from .capability_manager import close_capability_manager
@@ -47,10 +51,7 @@ async def validation_exception_handler(_request: Request, exc: HTTPException):
     )
 
 
-class RootResponse(BaseModel):
-    status: str
-    service: str
-    version: str
+
 
 
 @app.get(

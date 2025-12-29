@@ -25,7 +25,7 @@ class TestCreateComputePluginRouter:
 
                     # Verify create_master_router was called with correct args
                     mock_create_router.assert_called_once()
-                    call_kwargs = mock_create_router.call_args[1]
+                    call_kwargs = mock_create_router.call_args[1]  # pyright: ignore[reportAny] for testing purposes
                     assert "repository" in call_kwargs
                     assert "file_storage" in call_kwargs
                     assert "get_current_user" in call_kwargs
@@ -75,5 +75,5 @@ class TestCreateComputePluginRouter:
                         mock_require_permission.assert_called_once_with("ai_inference_support")
 
                         # Verify the permission checker was passed to create_master_router
-                        call_kwargs = mock_create_router.call_args[1]
+                        call_kwargs = mock_create_router.call_args[1]  # pyright: ignore[reportAny] for testing purposes
                         assert call_kwargs["get_current_user"] == mock_permission_checker

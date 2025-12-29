@@ -38,7 +38,7 @@ class TestCapabilityBroadcaster:
 
             assert broadcaster.broadcaster is not None
             mock_get_broadcaster.assert_called_once()
-            mock_broadcaster.set_will.assert_called_once()
+            mock_broadcaster.set_will.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_init_mqtt_broadcaster_no_broadcaster(self):
         """Test init when get_broadcaster returns None."""
@@ -56,7 +56,7 @@ class TestCapabilityBroadcaster:
         """Test publishing capabilities successfully."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster: MagicMock = MagicMock()
-            mock_broadcaster.publish_retained.return_value = True
+            mock_broadcaster.publish_retained.return_value = True  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -68,14 +68,14 @@ class TestCapabilityBroadcaster:
             broadcaster.publish()
 
             # Verify publish_retained was called
-            mock_broadcaster.publish_retained.assert_called_once()
-            call_args = mock_broadcaster.publish_retained.call_args
+            mock_broadcaster.publish_retained.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
+            call_args = mock_broadcaster.publish_retained.call_args  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
             # Verify topic
             assert "worker-1" in call_args[1]["topic"]
 
             # Verify payload structure
-            payload = call_args[1]["payload"]
+            payload = call_args[1]["payload"]  # pyright: ignore[reportAny] ignore mock types for testing purposes
             assert isinstance(payload, str)
             data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["id"] == "worker-1"
@@ -90,7 +90,7 @@ class TestCapabilityBroadcaster:
         """Test publishing when worker is busy."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster = MagicMock()
-            mock_broadcaster.publish_retained.return_value = True
+            mock_broadcaster.publish_retained.return_value = True  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -103,8 +103,8 @@ class TestCapabilityBroadcaster:
             broadcaster.publish()
 
             # Verify payload has idle_count=0
-            call_args = mock_broadcaster.publish_retained.call_args
-            payload = call_args[1]["payload"]
+            call_args = mock_broadcaster.publish_retained.call_args  # pyright: ignore[reportAny] ignore mock types for testing purposes
+            payload = call_args[1]["payload"]  # pyright: ignore[reportAny] ignore mock types for testing purposes
             assert isinstance(payload, str)
             data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["idle_count"] == 0
@@ -113,7 +113,7 @@ class TestCapabilityBroadcaster:
         """Test publishing when publish fails."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster = MagicMock()
-            mock_broadcaster.publish_retained.return_value = False
+            mock_broadcaster.publish_retained.return_value = False  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -125,7 +125,7 @@ class TestCapabilityBroadcaster:
             # Should not crash
             broadcaster.publish()
 
-            mock_broadcaster.publish_retained.assert_called_once()
+            mock_broadcaster.publish_retained.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_publish_without_init(self):
         """Test publishing without initializing broadcaster."""
@@ -143,7 +143,7 @@ class TestCapabilityBroadcaster:
         """Test clearing retained capabilities."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster = MagicMock()
-            mock_broadcaster.clear_retained.return_value = True
+            mock_broadcaster.clear_retained.return_value = True  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -154,15 +154,15 @@ class TestCapabilityBroadcaster:
 
             broadcaster.clear()
 
-            mock_broadcaster.clear_retained.assert_called_once()
-            call_args = mock_broadcaster.clear_retained.call_args
+            mock_broadcaster.clear_retained.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
+            call_args = mock_broadcaster.clear_retained.call_args  # pyright: ignore[reportAny] ignore mock types for testing purposes
             assert "worker-1" in call_args[0][0]
 
     def test_clear_failure(self):
         """Test clearing when clear fails."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster = MagicMock()
-            mock_broadcaster.clear_retained.return_value = False
+            mock_broadcaster.clear_retained.return_value = False  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -174,7 +174,7 @@ class TestCapabilityBroadcaster:
             # Should not crash
             broadcaster.clear()
 
-            mock_broadcaster.clear_retained.assert_called_once()
+            mock_broadcaster.clear_retained.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_clear_without_init(self):
         """Test clearing without initializing broadcaster."""
@@ -202,7 +202,7 @@ class TestCapabilityBroadcaster:
         """Test publishing with no active tasks."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster: MagicMock = MagicMock()
-            mock_broadcaster.publish_retained.return_value = True
+            mock_broadcaster.publish_retained.return_value = True  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -213,8 +213,8 @@ class TestCapabilityBroadcaster:
 
             broadcaster.publish()
 
-            call_args = mock_broadcaster.publish_retained.call_args
-            payload = call_args[1]["payload"]
+            call_args = mock_broadcaster.publish_retained.call_args  # pyright: ignore[reportAny] ignore mock types for testing purposes
+            payload = call_args[1]["payload"]  # pyright: ignore[reportAny] ignore mock types for testing purposes
             assert isinstance(payload, str)
             data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["capabilities"] == []
@@ -223,7 +223,7 @@ class TestCapabilityBroadcaster:
         """Test toggling idle state."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
             mock_broadcaster = MagicMock()
-            mock_broadcaster.publish_retained.return_value = True
+            mock_broadcaster.publish_retained.return_value = True  # pyright: ignore[reportAny] ignore mock types for testing purposes
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -234,20 +234,20 @@ class TestCapabilityBroadcaster:
 
             assert broadcaster.is_idle is True
             broadcaster.publish()
-            payload1 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            payload1 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])  # pyright: ignore[reportAny] ignore mock types for testing purposes
             data1: dict[str, object] = cast(dict[str, object], json.loads(payload1))
             assert data1["idle_count"] == 1
 
             # Set to busy
             broadcaster.is_idle = False
             broadcaster.publish()
-            payload2 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            payload2 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])  # pyright: ignore[reportAny] ignore mock types for testing purposes
             data2: dict[str, object] = cast(dict[str, object], json.loads(payload2))
             assert data2["idle_count"] == 0
 
             # Set back to idle
             broadcaster.is_idle = True
             broadcaster.publish()
-            payload3 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            payload3 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])  # pyright: ignore[reportAny] ignore mock types for testing purposes
             data3: dict[str, object] = cast(dict[str, object], json.loads(payload3))
             assert data3["idle_count"] == 1

@@ -105,7 +105,7 @@ class TestGetPublicKey:
                 # Clear cache
                 import compute.auth
 
-                compute.auth._public_key_cache = None
+                compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
                 key = await get_public_key()
                 assert key == test_key
@@ -118,7 +118,7 @@ class TestGetPublicKey:
             # Reset cache
             import compute.auth
 
-            compute.auth._public_key_cache = None
+            compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
     @pytest.mark.asyncio
     async def test_get_public_key_file_not_found(self):
@@ -130,7 +130,7 @@ class TestGetPublicKey:
                 # Clear cache
                 import compute.auth
 
-                compute.auth._public_key_cache = None
+                compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
                 with pytest.raises(HTTPException) as exc_info:
                     _ = await get_public_key()
@@ -141,7 +141,7 @@ class TestGetPublicKey:
         # Reset cache
         import compute.auth
 
-        compute.auth._public_key_cache = None
+        compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
     @pytest.mark.asyncio
     async def test_get_public_key_empty_file(self):
@@ -156,7 +156,7 @@ class TestGetPublicKey:
                     # Clear cache
                     import compute.auth
 
-                    compute.auth._public_key_cache = None
+                    compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
                     with pytest.raises(HTTPException) as exc_info:
                         _ = await get_public_key()
@@ -167,7 +167,7 @@ class TestGetPublicKey:
             # Reset cache
             import compute.auth
 
-            compute.auth._public_key_cache = None
+            compute.auth._public_key_cache = None  # pyright: ignore[reportPrivateUsage] for testing purposes
 
 
 class TestGetCurrentUser:

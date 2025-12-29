@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from compute.schemas import CapabilityStats
 from compute.service import CapabilityService, JobService
 
 
@@ -195,7 +196,7 @@ class TestJobService:
         old_job_dir = jobs_dir / "old-job"
         old_job_dir.mkdir()
         test_file = old_job_dir / "file.txt"
-        test_file.write_text("test content")
+        _ = test_file.write_text("test content")
 
         # Set old modification time (8 days ago)
         old_time = time.time() - (8 * 24 * 60 * 60)
@@ -242,17 +243,19 @@ class TestCapabilityService:
     def test_get_available_capabilities_success(self, test_db: Session):
         """Test getting available capabilities."""
         mock_manager = MagicMock()
-        mock_manager.get_cached_capabilities.return_value = {
-            "image_resize": 2,
-            "image_conversion": 1,
-        }
+        mock_manager.get_cached_capabilities.return_value = CapabilityStats(  # pyright: ignore[reportAny] ignore mock types for testing purposes
+            root={
+                "image_resize": 2,
+                "image_conversion": 1,
+            }
+        )
 
         with patch("compute.capability_manager.get_capability_manager", return_value=mock_manager):
             service = CapabilityService(test_db)
             result = service.get_available_capabilities()
 
-            assert result == {"image_resize": 2, "image_conversion": 1}
-            mock_manager.get_cached_capabilities.assert_called_once()
+            assert result.root == {"image_resize": 2, "image_conversion": 1}
+            mock_manager.get_cached_capabilities.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_get_available_capabilities_error(self, test_db: Session):
         """Test get_available_capabilities when error occurs."""
@@ -263,8 +266,8 @@ class TestCapabilityService:
             service = CapabilityService(test_db)
             result = service.get_available_capabilities()
 
-            # Should return empty dict on error
-            assert result == {}
+            # Should return empty dict wrapped in CapabilityStats on error
+            assert result.root == {}
 
     def test_get_worker_count_success(self, test_db: Session):
         """Test getting worker count."""

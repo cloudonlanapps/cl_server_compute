@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .auth import UserPayload, require_admin, require_permission
 from .database import get_db
-from .schemas import CleanupResult, JobResponse, StorageInfo
+from .schemas import CleanupResult, JobResponse, StorageInfo, WorkerCapabilitiesResponse
 from .service import CapabilityService, JobService
 
 router = APIRouter()
@@ -92,12 +92,12 @@ async def cleanup_old_jobs(
     tags=["compute"],
     summary="Get Worker Capabilities",
     description="Returns available worker capabilities and their available counts",
-    response_model=dict[str, int | dict[str, int]],
+    response_model=WorkerCapabilitiesResponse,
     operation_id="get_worker_capabilities",
 )
 async def get_worker_capabilities(
     db: Session = Depends(get_db),
-) -> dict[str, int | dict[str, int]]:
+) -> WorkerCapabilitiesResponse:
     """Get available worker capabilities and counts from connected workers.
 
     Returns a dictionary with:
@@ -117,7 +117,7 @@ async def get_worker_capabilities(
     capability_service = CapabilityService(db)
     capabilities = capability_service.get_available_capabilities()
     num_workers = capability_service.get_worker_count()
-    return {
-        "num_workers": num_workers,
-        "capabilities": capabilities,
-    }
+    return WorkerCapabilitiesResponse(
+        num_workers=num_workers,
+        capabilities=capabilities,
+    )

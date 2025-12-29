@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import Job
-from .schemas import CleanupResult, JobResponse, StorageInfo
+from .schemas import CapabilityStats, CleanupResult, JobResponse, StorageInfo
 
 
 class JobService:
@@ -174,7 +174,7 @@ class CapabilityService:
         """
         self.db: Session = db
 
-    def get_available_capabilities(self) -> dict[str, int]:
+    def get_available_capabilities(self) -> CapabilityStats:
         """Get aggregated available worker capabilities.
 
         Returns:
@@ -191,7 +191,7 @@ class CapabilityService:
 
             logger = logging.getLogger(__name__)
             logger.error(f"Error retrieving worker capabilities: {e}")
-            return {}
+            return CapabilityStats(root={})
 
     def get_worker_count(self) -> int:
         """Get total number of connected workers.

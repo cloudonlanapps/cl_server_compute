@@ -6,8 +6,6 @@ import os
 import sys
 from argparse import ArgumentParser, Namespace
 
-import uvicorn
-
 logger = logging.getLogger("compute")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -46,10 +44,18 @@ def main() -> int:
     _ = parser.add_argument("--reload", action="store_true", help="Enable uvicorn reload (dev)")
     args = parser.parse_args(namespace=Args())
 
+    # Ensure CL_SERVER_DIR exists and is writable (creates if needed)
+    # This MUST happen before importing anything that uses Config
+    from .utils import ensure_cl_server_dir
+    _ = ensure_cl_server_dir()
+
     # Set env vars expected by your app
     if args.no_auth:
         os.environ["AUTH_DISABLED"] = "true"
     _ = os.environ.setdefault("CL_SERVER_DIR", os.getenv("CL_SERVER_DIR", ""))
+
+    # Import uvicorn here after directory is set up
+    import uvicorn
 
     # Start server (blocks)
     try:

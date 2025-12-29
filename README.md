@@ -22,6 +22,31 @@ uv sync
 uv sync --all-extras
 ```
 
+### Database Setup
+
+Initialize the database with Alembic migrations:
+
+```bash
+# Create the versions directory (if it doesn't exist)
+mkdir -p alembic/versions
+
+# Apply database migrations
+uv run alembic upgrade head
+
+# Optional: Check current migration version
+uv run alembic current
+```
+
+**Note:** The `alembic/versions` directory must exist before running migrations. If you need to create a new migration after schema changes:
+
+```bash
+# Generate a new migration
+uv run alembic revision --autogenerate -m "description of changes"
+
+# Apply the new migration
+uv run alembic upgrade head
+```
+
 ### Running the Server
 
 ```bash
@@ -42,12 +67,17 @@ uv run compute-server --no-auth
 
 The worker executes compute tasks by polling the job queue and processing them using registered plugins.
 
+**Important:** The worker requires the compute server to be running on localhost. It will check server connectivity before starting.
+
 ```bash
-# Run worker with default settings
+# Run worker with default settings (connects to localhost:8002)
 uv run compute-worker
 
 # Run with custom worker ID
 uv run compute-worker --worker-id worker-1
+
+# Connect to server on different port
+uv run compute-worker --port 8003
 
 # Run with specific task types
 uv run compute-worker --tasks clip_embedding,face_detection
@@ -59,6 +89,12 @@ uv run compute-worker --log-level DEBUG
 uv run compute-worker --worker-id worker-1 &
 uv run compute-worker --worker-id worker-2 &
 ```
+
+**Worker Arguments:**
+- `--worker-id, -w` - Unique worker identifier (default: worker-default)
+- `--port, -p` - Compute server port on localhost (default: 8002, env: COMPUTE_SERVER_PORT)
+- `--tasks, -t` - Comma-separated task types to process (default: all available)
+- `--log-level, -l` - Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
 
 ## Environment Variables
 

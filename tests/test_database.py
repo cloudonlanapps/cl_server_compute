@@ -23,17 +23,17 @@ class TestEnableWalMode:
         # Create mock cursor and connection
         mock_cursor: MagicMock = MagicMock()
         mock_conn: MagicMock = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.cursor.return_value = mock_cursor  # pyright: ignore[reportAny] for testing purposes
 
         # Call enable_wal_mode
         enable_wal_mode(mock_conn, None)
 
         # Verify cursor methods were called
-        assert mock_cursor.execute.called
-        assert mock_cursor.close.called
+        assert mock_cursor.execute.called  # pyright: ignore[reportAny] for testing purposes
+        assert mock_cursor.close.called  # pyright: ignore[reportAny] for testing purposes
 
         # Verify WAL mode was set
-        calls = [str(call) for call in mock_cursor.execute.call_args_list]
+        calls = [str(call) for call in mock_cursor.execute.call_args_list]  # pyright: ignore[reportAny] for testing purposes
         assert any("PRAGMA journal_mode=WAL" in str(call) for call in calls)
         assert any("PRAGMA synchronous=NORMAL" in str(call) for call in calls)
         assert any("PRAGMA foreign_keys=ON" in str(call) for call in calls)
@@ -41,15 +41,15 @@ class TestEnableWalMode:
     def test_enable_wal_mode_closes_cursor(self):
         """Test that cursor is closed even if exception occurs."""
         mock_cursor: MagicMock = MagicMock()
-        mock_cursor.execute.side_effect = Exception("Test error")
+        mock_cursor.execute.side_effect = Exception("Test error")  # pyright: ignore[reportAny] for testing purposes
         mock_conn: MagicMock = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
+        mock_conn.cursor.return_value = mock_cursor  # pyright: ignore[reportAny] for testing purposes
 
         # Call should not raise, but cursor should still be closed
         with pytest.raises(Exception):
             enable_wal_mode(mock_conn, None)
 
-        assert mock_cursor.close.called
+        assert mock_cursor.close.called  # pyright: ignore[reportAny] for testing purposes
 
 
 class TestCreateDbEngine:

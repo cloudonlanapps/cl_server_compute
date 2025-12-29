@@ -10,19 +10,22 @@ Compute is a FastAPI microservice that manages compute jobs and worker capabilit
 compute/
 ├── src/compute/
 │   ├── __init__.py           # Public API exports
-│   ├── server.py             # Server CLI entry point
-│   ├── worker.py             # Worker CLI entry point
+│   ├── compute_server.py     # Server CLI entry point
+│   ├── compute_worker.py     # Worker CLI entry point
 │   ├── task_server.py        # FastAPI app
 │   ├── routes.py             # API routes
 │   ├── service.py            # Business logic
 │   ├── schemas.py            # Pydantic models
 │   ├── models.py             # Database models (re-exports)
-│   ├── database.py           # Database configuration
+│   ├── database.py           # Database configuration and migrations
 │   ├── auth.py               # Authentication
 │   ├── capability_manager.py # Worker capability tracking
-│   └── plugins.py            # Plugin system integration
+│   ├── plugins.py            # Plugin system integration
+│   ├── utils.py              # Utility functions (directory/server checks)
+│   └── worker.py             # Worker implementation
 ├── tests/                    # Test suite
 ├── alembic/                  # Database migrations
+│   └── versions/             # Migration scripts
 ├── pyproject.toml            # Package configuration
 ├── README.md                 # User documentation
 └── INTERNALS.md              # This file
@@ -82,14 +85,25 @@ uv run basedpyright
    - `CapabilityService` - Worker capability queries
 3. **Capability Manager** (`capability_manager.py`) - MQTT-based worker discovery
 4. **Plugins** (`plugins.py`) - Integration with cl_ml_tools plugin system
-5. **Database** (`database.py`) - SQLAlchemy session management with WAL mode
+5. **Database** (`database.py`) - SQLAlchemy session management with WAL mode and migrations
+6. **Utils** (`utils.py`) - Utility functions for startup validation
+   - `ensure_cl_server_dir()` - Creates CL_SERVER_DIR (server only)
+   - `validate_cl_server_dir_exists()` - Validates CL_SERVER_DIR exists (worker only)
+   - `check_server_running()` - Checks if server is accessible on a port
+   - `ensure_server_running()` - Validates server is running or exits (worker only)
 
 ### Database
 
 - Uses shared models from `cl_server_shared` (Job, QueueEntry)
 - Connects to WORKER_DATABASE_URL (shared with worker service)
 - SQLite with WAL mode for concurrent access
-- Alembic for migrations
+- Alembic for migrations (automatically run on server startup)
+
+**Automatic Migrations:**
+- Server runs `alembic upgrade head` automatically during startup
+- Migrations are validated before execution (checks for alembic.ini and versions directory)
+- Server will fail to start if migrations cannot be run
+- Worker does NOT run migrations - relies on server to create tables
 
 ### Authentication
 
@@ -98,6 +112,28 @@ uv run basedpyright
 - Permission-based access control:
   - `ai_inference_support` - Required for job operations
   - `admin` - Required for admin endpoints
+
+### Startup and Initialization
+
+**Server Startup** (`compute_server.py`):
+1. Parse command-line arguments
+2. **Create CL_SERVER_DIR** - `ensure_cl_server_dir()` creates directory if needed
+3. Set environment variables (AUTH_DISABLED, etc.)
+4. Import and start FastAPI application
+5. **Run database migrations** - Automatically runs `alembic upgrade head` in lifespan startup
+6. Start uvicorn server
+
+**Worker Startup** (`compute_worker.py`):
+1. Parse command-line arguments (includes `--port` for server port)
+2. **Check server is running** - `ensure_server_running()` verifies server on `localhost:PORT`
+3. **Validate CL_SERVER_DIR exists** - `validate_cl_server_dir_exists()` ensures server created it
+4. Import ComputeWorker class
+5. Start worker main loop
+
+**Separation of Responsibilities:**
+- **Server owns**: Directory creation, database migrations, table creation
+- **Worker owns**: Reading/writing database records, processing jobs
+- **Worker requires**: Server must be running before worker can start
 
 ### Worker Capability Discovery
 
@@ -109,6 +145,11 @@ uv run basedpyright
 ### Worker Execution (`worker.py`)
 
 The worker is a standalone process that executes compute jobs:
+
+**Prerequisites:**
+- Compute server must be running on localhost
+- CL_SERVER_DIR must exist (created by server)
+- Database tables must exist (created by server migrations)
 
 1. **Plugin Discovery**
    - Auto-discovers plugins from `pyproject.toml` entry points
@@ -180,16 +221,39 @@ Task Server integrates with cl_ml_tools plugin system:
 
 ### Database Migrations
 
+**Automatic Migrations:**
+- Migrations are automatically applied when the server starts
+- Server validates that `alembic/versions` directory exists and contains at least one migration
+- Server will fail to start if migrations cannot be run
+
+**Manual Migration Tasks (for development):**
+
+**Important:** The `alembic/versions` directory must exist before creating new migrations:
+
 ```bash
-# Create a new migration
+# Create versions directory if needed
+mkdir -p alembic/versions
+
+# Create a new migration after schema changes
 uv run alembic revision --autogenerate -m "description"
 
-# Apply migrations
+# Manually apply migrations (not needed - server does this automatically)
 uv run alembic upgrade head
 
-# Rollback migration
+# Rollback one migration (development only)
 uv run alembic downgrade -1
+
+# Check current migration version
+uv run alembic current
+
+# View migration history
+uv run alembic history
 ```
+
+**Note:**
+- Users do NOT need to run migrations manually - the server does this automatically
+- Developers only need to create new migrations when changing the schema
+- The `alembic/versions` directory must exist and contain at least one migration file
 
 ## Configuration
 

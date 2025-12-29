@@ -57,7 +57,7 @@ class TestComputeWorker:
         ):
             # Configure mock library worker
             mock_worker_instance = MagicMock()
-            mock_worker_instance.get_supported_task_types.return_value = [
+            mock_worker_instance.get_supported_task_types.return_value = [  # pyright: ignore[reportAny] ignore mock type for testing purposes
                 "image_resize",
                 "image_conversion",
             ]
@@ -112,7 +112,7 @@ class TestComputeWorker:
             patch("compute.worker.Worker") as mock_worker,
         ):
             mock_worker_instance = MagicMock()
-            mock_worker_instance.get_supported_task_types.return_value = []
+            mock_worker_instance.get_supported_task_types.return_value = []  # pyright: ignore[reportAny] ignore mock type for testing purposes
             mock_worker.return_value = mock_worker_instance
 
             with pytest.raises(RuntimeError, match="No compute plugins found"):
@@ -140,7 +140,7 @@ class TestComputeWorker:
         worker.capability_broadcaster.publish = MagicMock()
 
         # Run heartbeat task for a short time
-        task = asyncio.create_task(worker._heartbeat_task())
+        task = asyncio.create_task(worker._heartbeat_task())  # pyright: ignore[reportPrivateUsage]
 
         # Wait a bit then cancel
         await asyncio.sleep(0.1)
@@ -161,7 +161,7 @@ class TestComputeWorker:
         worker.capability_broadcaster.publish = MagicMock()
 
         # Start heartbeat task
-        task = asyncio.create_task(worker._heartbeat_task())
+        task = asyncio.create_task(worker._heartbeat_task())  # pyright: ignore[reportPrivateUsage]
 
         # Set shutdown event
         shutdown_event.set()
@@ -181,7 +181,7 @@ class TestComputeWorker:
         worker = ComputeWorker(worker_id="test-worker")
         worker.capability_broadcaster.publish = MagicMock()
 
-        result = await worker._process_next_job()
+        result = await worker._process_next_job()  # pyright: ignore[reportPrivateUsage]
 
         assert result is True
         mock_dependencies["worker_instance"].run_once.assert_called_once()
@@ -198,7 +198,7 @@ class TestComputeWorker:
         worker = ComputeWorker(worker_id="test-worker")
         worker.capability_broadcaster.publish = MagicMock()
 
-        result = await worker._process_next_job()
+        result = await worker._process_next_job()  # pyright: ignore[reportPrivateUsage]
 
         assert result is False
 
@@ -213,7 +213,7 @@ class TestComputeWorker:
         worker = ComputeWorker(worker_id="test-worker")
         worker.capability_broadcaster.publish = MagicMock()
 
-        result = await worker._process_next_job()
+        result = await worker._process_next_job()  # pyright: ignore[reportPrivateUsage]
 
         assert result is False  # Should return False on error
 
@@ -227,7 +227,7 @@ class TestComputeWorker:
         worker.capability_broadcaster.is_idle = True
         worker.capability_broadcaster.publish = MagicMock()
 
-        _ = await worker._process_next_job()
+        _ = await worker._process_next_job()  # pyright: ignore[reportPrivateUsage]
 
         # Should be marked idle after processing
         assert worker.capability_broadcaster.is_idle is True

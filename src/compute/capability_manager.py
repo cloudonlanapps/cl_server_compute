@@ -10,6 +10,8 @@ from cl_ml_tools import MQTTBroadcaster, NoOpBroadcaster, get_broadcaster
 from cl_server_shared.config import Config
 from pydantic import BaseModel
 
+from .schemas import CapabilityStats
+
 logger = logging.getLogger(__name__)
 
 _capability_manager_instance: CapabilityManager | None = None
@@ -55,12 +57,12 @@ class CapabilityManager:
         topic_pattern = f"{Config.CAPABILITY_TOPIC_PREFIX}/+"
 
         if self.broadcaster:
-            _ = self.broadcaster.subscribe(topic=topic_pattern, callback=self._on_message)
+            _ = self.broadcaster.subscribe(topic=topic_pattern, callback=self.on_message)
             logger.info(f"Subscribed to capability topics: {topic_pattern}")
 
         self.ready_event.set()
 
-    def _on_message(self, topic: str, payload: str):
+    def on_message(self, topic: str, payload: str):
         """Callback for incoming capability messages.
 
         Args:
@@ -94,7 +96,7 @@ class CapabilityManager:
         except Exception as e:
             logger.error(f"Error processing capability message: {e}")
 
-    def get_cached_capabilities(self) -> dict[str, int]:
+    def get_cached_capabilities(self) -> CapabilityStats:
         """Get aggregated idle counts by capability.
 
         Returns:
@@ -113,7 +115,7 @@ class CapabilityManager:
                         aggregated[capability] = 0
                     aggregated[capability] += idle_count
 
-        return aggregated
+        return CapabilityStats(root=aggregated)
 
     def wait_for_capabilities(self, timeout: int = Config.CAPABILITY_CACHE_TIMEOUT) -> bool:
         """Wait for capability manager to be ready.
@@ -126,7 +128,7 @@ class CapabilityManager:
         """
         return self.ready_event.wait(timeout=timeout)
 
-    def get_worker_count_by_capability(self) -> dict[str, int]:
+    def get_worker_count_by_capability(self) -> CapabilityStats:
         """Get total worker count by capability (not idle count).
 
         Returns:
@@ -144,7 +146,7 @@ class CapabilityManager:
                         total_workers[capability] = 0
                     total_workers[capability] += 1
 
-        return total_workers
+        return CapabilityStats(root=total_workers)
 
     def disconnect(self):
         """Disconnect from broadcaster."""

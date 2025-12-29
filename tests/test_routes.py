@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from compute.auth import UserPayload
 from compute.routes import router
-from compute.schemas import CleanupResult, JobResponse, StorageInfo
+from compute.schemas import (
+    CapabilityStats,
+    CleanupResult,
+    JobResponse,
+    StorageInfo,
+    WorkerCapabilitiesResponse,
+)
 
 
 @pytest.fixture
@@ -65,7 +71,7 @@ def mock_admin() -> UserPayload:
 class TestGetJob:
     """Tests for GET /jobs/{job_id} endpoint."""
 
-    def test_get_job_success(self, client: TestClient, test_db: Session, mock_user: UserPayload):
+    def test_get_job_success(self, client: TestClient, test_db: Session):
         """Test getting a job successfully."""
         from compute.database import get_db
 
@@ -93,15 +99,15 @@ class TestGetJob:
                 response = client.get("/jobs/test-job-1")
 
                 assert response.status_code == 200
-                data = response.json()
-                assert data["job_id"] == "test-job-1"
-                assert data["task_type"] == "test_task"
-                assert data["status"] == "queued"
+                data = JobResponse.model_validate(response.json())
+                assert data.job_id == "test-job-1"
+                assert data.task_type == "test_task"
+                assert data.status == "queued"
 
                 # Clean up
                 app.dependency_overrides.clear()
 
-    def test_get_job_not_found(self, client: TestClient, test_db: Session, mock_user: UserPayload):
+    def test_get_job_not_found(self, client: TestClient, test_db: Session):
         """Test getting a non-existent job."""
         from fastapi import HTTPException
 
@@ -147,7 +153,7 @@ class TestGetJob:
 class TestDeleteJob:
     """Tests for DELETE /jobs/{job_id} endpoint."""
 
-    def test_delete_job_success(self, client: TestClient, test_db: Session, mock_user: UserPayload):
+    def test_delete_job_success(self, client: TestClient, test_db: Session):
         """Test deleting a job successfully."""
         # Create test job
         job = Job(
@@ -173,8 +179,8 @@ class TestDeleteJob:
             with patch("compute.service.JobRepositoryService") as mock_repo_class:
                 with patch("compute.service.JobStorageService"):
                     mock_repo = MagicMock()
-                    mock_repo.get_job.return_value = job
-                    mock_repo.delete_job.return_value = None
+                    mock_repo.get_job.return_value = job  # pyright: ignore[reportAny] ignore mock types for testing purposes
+                    mock_repo.delete_job.return_value = None  # pyright: ignore[reportAny] ignore mock types for testing purposes
                     mock_repo_class.return_value = mock_repo
 
                     app = cast(FastAPI, client.app)
@@ -188,9 +194,7 @@ class TestDeleteJob:
                     app = cast(FastAPI, client.app)
                     app.dependency_overrides.clear()
 
-    def test_delete_job_not_found(
-        self, client: TestClient, test_db: Session, mock_user: UserPayload
-    ):
+    def test_delete_job_not_found(self, client: TestClient, test_db: Session):
         """Test deleting a non-existent job."""
         from compute.database import get_db
 
@@ -200,7 +204,7 @@ class TestDeleteJob:
         with patch("compute.auth.Config.AUTH_DISABLED", True):
             with patch("compute.service.JobRepositoryService") as mock_repo_class:
                 mock_repo = MagicMock()
-                mock_repo.get_job.return_value = None
+                mock_repo.get_job.return_value = None  # pyright: ignore[reportAny] ignore mock types for testing purposes
                 mock_repo_class.return_value = mock_repo
 
                 app = cast(FastAPI, client.app)
@@ -238,13 +242,11 @@ class TestGetStorageSize:
             response = client.get("/admin/jobs/storage/size")
 
             assert response.status_code == 200
-            data = response.json()
-            assert data["total_size"] == 1024000
-            assert data["job_count"] == 42
+            data = StorageInfo.model_validate(response.json())
+            assert data.total_size == 1024000
+            assert data.job_count == 42
 
-    def test_get_storage_size_requires_admin(
-        self, client: TestClient, test_db: Session, mock_user: UserPayload
-    ):
+    def test_get_storage_size_requires_admin(self, client: TestClient, test_db: Session):
         """Test that storage size endpoint requires admin."""
         from fastapi import HTTPException
 
@@ -287,9 +289,9 @@ class TestCleanupOldJobs:
             response = client.delete("/admin/jobs/cleanup?days=7")
 
             assert response.status_code == 200
-            data = response.json()
-            assert data["deleted_count"] == 10
-            assert data["freed_space"] == 5242880
+            data = CleanupResult.model_validate(response.json())
+            assert data.deleted_count == 10
+            assert data.freed_space == 5242880
 
     def test_cleanup_old_jobs_custom_days(
         self, client: TestClient, test_db: Session, mock_admin: UserPayload
@@ -313,9 +315,7 @@ class TestCleanupOldJobs:
             assert response.status_code == 200
             mock_cleanup.assert_called_once_with(30)
 
-    def test_cleanup_old_jobs_requires_admin(
-        self, client: TestClient, test_db: Session, mock_user: UserPayload
-    ):
+    def test_cleanup_old_jobs_requires_admin(self, client: TestClient, test_db: Session):
         """Test that cleanup endpoint requires admin."""
         from fastapi import HTTPException
 
@@ -347,19 +347,21 @@ class TestGetWorkerCapabilities:
 
         with patch("compute.service.CapabilityService.get_available_capabilities") as mock_get_caps:
             with patch("compute.service.CapabilityService.get_worker_count") as mock_get_count:
-                mock_get_caps.return_value = {
-                    "image_resize": 2,
-                    "image_conversion": 1,
-                }
+                mock_get_caps.return_value = CapabilityStats(
+                    root={
+                        "image_resize": 2,
+                        "image_conversion": 1,
+                    }
+                )
                 mock_get_count.return_value = 3
 
                 response = client.get("/capabilities")
 
                 assert response.status_code == 200
-                data = response.json()
-                assert data["num_workers"] == 3
-                assert data["capabilities"]["image_resize"] == 2
-                assert data["capabilities"]["image_conversion"] == 1
+                data = WorkerCapabilitiesResponse.model_validate(response.json())
+                assert data.num_workers == 3
+                assert data.capabilities.root["image_resize"] == 2
+                assert data.capabilities.root["image_conversion"] == 1
 
     def test_get_worker_capabilities_no_workers(self, client: TestClient, test_db: Session):
         """Test getting capabilities when no workers available."""
@@ -370,12 +372,12 @@ class TestGetWorkerCapabilities:
 
         with patch("compute.service.CapabilityService.get_available_capabilities") as mock_get_caps:
             with patch("compute.service.CapabilityService.get_worker_count") as mock_get_count:
-                mock_get_caps.return_value = {}
+                mock_get_caps.return_value = CapabilityStats(root={})
                 mock_get_count.return_value = 0
 
                 response = client.get("/capabilities")
 
                 assert response.status_code == 200
-                data = response.json()
-                assert data["num_workers"] == 0
-                assert data["capabilities"] == {}
+                data = WorkerCapabilitiesResponse.model_validate(response.json())
+                assert data.num_workers == 0
+                assert data.capabilities.root == {}

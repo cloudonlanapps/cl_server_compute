@@ -60,7 +60,7 @@ class TestCapabilityManager:
             assert manager.capabilities_cache == {}
             assert manager.broadcaster is not None
             assert manager.ready_event.is_set()
-            mock_broadcaster.subscribe.assert_called_once()
+            mock_broadcaster.subscribe.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_capability_manager_init_no_broadcaster(self):
         """Test CapabilityManager when broadcaster is None."""
@@ -89,7 +89,7 @@ class TestCapabilityManager:
                 }
             )
 
-            manager._on_message(topic, payload)
+            manager.on_message(topic, payload)
 
             assert "worker-1" in manager.capabilities_cache
             assert manager.capabilities_cache["worker-1"].id == "worker-1"
@@ -113,11 +113,11 @@ class TestCapabilityManager:
                     "timestamp": 1234567890000,
                 }
             )
-            manager._on_message(topic, payload)
+            manager.on_message(topic, payload)
             assert "worker-1" in manager.capabilities_cache
 
             # Now send empty payload (LWT)
-            manager._on_message(topic, "")
+            manager.on_message(topic, "")
 
             # Worker should be removed from cache
             assert "worker-1" not in manager.capabilities_cache
@@ -131,7 +131,7 @@ class TestCapabilityManager:
             manager = CapabilityManager()
 
             # Topic with less than 3 parts
-            manager._on_message("invalid/topic", '{"id": "test"}')
+            manager.on_message("invalid/topic", '{"id": "test"}')
 
             # Should not crash, cache should remain empty
             assert len(manager.capabilities_cache) == 0
@@ -145,7 +145,7 @@ class TestCapabilityManager:
             manager = CapabilityManager()
 
             topic = "inference/workers/worker-1"
-            manager._on_message(topic, "invalid json{")
+            manager.on_message(topic, "invalid json{")
 
             # Should not crash, cache should remain empty
             assert len(manager.capabilities_cache) == 0
@@ -160,7 +160,7 @@ class TestCapabilityManager:
 
             result = manager.get_cached_capabilities()
 
-            assert result == {}
+            assert result.root == {}
 
     def test_get_cached_capabilities_single_worker(self):
         """Test getting capabilities with single worker."""
@@ -180,12 +180,12 @@ class TestCapabilityManager:
                     "timestamp": 1234567890000,
                 }
             )
-            manager._on_message(topic, payload)
+            manager.on_message(topic, payload)
 
             result = manager.get_cached_capabilities()
 
-            assert result["image_resize"] == 1
-            assert result["image_conversion"] == 1
+            assert result.root["image_resize"] == 1
+            assert result.root["image_conversion"] == 1
 
     def test_get_cached_capabilities_multiple_workers(self):
         """Test aggregating capabilities from multiple workers."""
@@ -196,7 +196,7 @@ class TestCapabilityManager:
             manager = CapabilityManager()
 
             # Add first worker
-            manager._on_message(
+            manager.on_message(
                 "inference/workers/worker-1",
                 json.dumps(
                     {
@@ -209,7 +209,7 @@ class TestCapabilityManager:
             )
 
             # Add second worker
-            manager._on_message(
+            manager.on_message(
                 "inference/workers/worker-2",
                 json.dumps(
                     {
@@ -226,9 +226,9 @@ class TestCapabilityManager:
             # image_resize: 1 + 2 = 3
             # image_conversion: 1
             # face_detection: 2
-            assert result["image_resize"] == 3
-            assert result["image_conversion"] == 1
-            assert result["face_detection"] == 2
+            assert result.root["image_resize"] == 3
+            assert result.root["image_conversion"] == 1
+            assert result.root["face_detection"] == 2
 
     def test_wait_for_capabilities(self):
         """Test waiting for capability manager to be ready."""
@@ -252,7 +252,7 @@ class TestCapabilityManager:
             manager = CapabilityManager()
 
             # Add workers
-            manager._on_message(
+            manager.on_message(
                 "inference/workers/worker-1",
                 json.dumps(
                     {
@@ -264,7 +264,7 @@ class TestCapabilityManager:
                 ),
             )
 
-            manager._on_message(
+            manager.on_message(
                 "inference/workers/worker-2",
                 json.dumps(
                     {
@@ -280,8 +280,8 @@ class TestCapabilityManager:
 
             # Both workers have image_resize
             # Only worker-1 has image_conversion
-            assert result["image_resize"] == 2
-            assert result["image_conversion"] == 1
+            assert result.root["image_resize"] == 2
+            assert result.root["image_conversion"] == 1
 
     def test_disconnect(self):
         """Test disconnecting from broadcaster."""
@@ -292,7 +292,7 @@ class TestCapabilityManager:
             manager = CapabilityManager()
             manager.disconnect()
 
-            mock_broadcaster.disconnect.assert_called_once()
+            mock_broadcaster.disconnect.assert_called_once()  # pyright: ignore[reportAny] ignore mock types for testing purposes
 
     def test_disconnect_no_broadcaster(self):
         """Test disconnecting when broadcaster is None."""
@@ -314,7 +314,7 @@ class TestCapabilityManagerSingleton:
             # Reset singleton
             import compute.capability_manager
 
-            compute.capability_manager._capability_manager_instance = None
+            compute.capability_manager._capability_manager_instance = None  # pyright: ignore[reportPrivateUsage]
 
             manager1 = get_capability_manager()
             manager2 = get_capability_manager()
@@ -322,7 +322,7 @@ class TestCapabilityManagerSingleton:
             assert manager1 is manager2
 
             # Clean up
-            compute.capability_manager._capability_manager_instance = None
+            compute.capability_manager._capability_manager_instance = None  # pyright: ignore[reportPrivateUsage]
 
     def test_close_capability_manager(self):
         """Test closing capability manager singleton."""
@@ -333,7 +333,7 @@ class TestCapabilityManagerSingleton:
             # Reset singleton
             import compute.capability_manager
 
-            compute.capability_manager._capability_manager_instance = None
+            compute.capability_manager._capability_manager_instance = None  # pyright: ignore[reportPrivateUsage]
 
             manager = get_capability_manager()
             assert manager is not None
@@ -341,15 +341,15 @@ class TestCapabilityManagerSingleton:
             close_capability_manager()
 
             # Singleton should be None after closing
-            assert compute.capability_manager._capability_manager_instance is None
+            assert compute.capability_manager._capability_manager_instance is None  # pyright: ignore[reportPrivateUsage]  for testing purposes
 
     def test_close_capability_manager_when_none(self):
         """Test closing when manager is already None."""
         import compute.capability_manager
 
-        compute.capability_manager._capability_manager_instance = None
+        compute.capability_manager._capability_manager_instance = None  # pyright: ignore[reportPrivateUsage]  for testing purposes
 
         # Should not crash
         close_capability_manager()
 
-        assert compute.capability_manager._capability_manager_instance is None
+        assert compute.capability_manager._capability_manager_instance is None  # pyright: ignore[reportPrivateUsage]  for testing purposes
