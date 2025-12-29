@@ -113,6 +113,33 @@ def get_db() -> Generator[Session, None, None]:
     yield from get_db_session(SessionLocal)
 
 
+def check_tables_exist() -> None:
+    """Check that required database tables exist.
+
+    This should be called on server startup to ensure migrations have been run.
+
+    Raises:
+        RuntimeError: If required tables don't exist
+    """
+    from sqlalchemy import inspect
+
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+
+    required_tables = ["jobs", "queue_entries", "alembic_version"]
+
+    missing_tables = [table for table in required_tables if table not in existing_tables]
+
+    if missing_tables:
+        msg = (
+            f"Database tables missing: {', '.join(missing_tables)}\n"
+            "Please run database migrations first:\n"
+            "  uv run compute-migrate"
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+
 def run_migrations() -> None:
     """Run Alembic migrations to ensure database schema is up to date.
 
@@ -161,11 +188,15 @@ def run_migrations() -> None:
     # Create Alembic config and run migrations
     alembic_cfg = AlembicConfig(str(alembic_ini))
     alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
+    # Prevent alembic from reconfiguring logging
+    alembic_cfg.attributes["configure_logger"] = False
 
     try:
+        import sys
         logger.info("Running database migrations...")
         command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations completed successfully")
+        print("INFO:     Database migrations completed successfully", file=sys.stderr, flush=True)
     except Exception as e:
         msg = f"Failed to run database migrations: {e}"
         logger.error(msg)

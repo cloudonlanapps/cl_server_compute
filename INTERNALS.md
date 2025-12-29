@@ -97,13 +97,13 @@ uv run basedpyright
 - Uses shared models from `cl_server_shared` (Job, QueueEntry)
 - Connects to WORKER_DATABASE_URL (shared with worker service)
 - SQLite with WAL mode for concurrent access
-- Alembic for migrations (automatically run on server startup)
+- Alembic for migrations (run via `compute-migrate` CLI)
 
-**Automatic Migrations:**
-- Server runs `alembic upgrade head` automatically during startup
-- Migrations are validated before execution (checks for alembic.ini and versions directory)
-- Server will fail to start if migrations cannot be run
-- Worker does NOT run migrations - relies on server to create tables
+**Migration Strategy:**
+- Migrations are run separately using `uv run compute-migrate`
+- Server validates tables exist on startup (fails with clear error if not)
+- Worker does NOT run migrations - relies on user to run `compute-migrate` first
+- This keeps server startup fast and predictable
 
 ### Authentication
 
@@ -115,13 +115,19 @@ uv run basedpyright
 
 ### Startup and Initialization
 
+**Database Migration** (`compute-migrate` CLI):
+1. Must be run BEFORE starting server (only needed once or after schema changes)
+2. Creates CL_SERVER_DIR if needed
+3. Runs Alembic migrations (`alembic upgrade head`)
+4. Creates all required database tables
+
 **Server Startup** (`compute_server.py`):
 1. Parse command-line arguments
 2. **Create CL_SERVER_DIR** - `ensure_cl_server_dir()` creates directory if needed
 3. Set environment variables (AUTH_DISABLED, etc.)
 4. Import and start FastAPI application
-5. **Run database migrations** - Automatically runs `alembic upgrade head` in lifespan startup
-6. Start uvicorn server
+5. **Check database tables exist** - Validates migrations have been run
+6. Start uvicorn server (fails if tables don't exist)
 
 **Worker Startup** (`compute_worker.py`):
 1. Parse command-line arguments (includes `--port` for server port)
@@ -169,10 +175,14 @@ The worker is a standalone process that executes compute jobs:
    - Heartbeat interval: `Config.MQTT_HEARTBEAT_INTERVAL`
 
 4. **Graceful Shutdown**
-   - Handles SIGINT/SIGTERM signals
-   - Completes current job before shutting down
-   - Clears retained MQTT capability messages
-   - Closes broadcaster connection
+   - Handles SIGINT/SIGTERM signals (Ctrl+C)
+   - **First signal**: Initiates graceful shutdown
+     - Completes current job before exiting
+     - Clears retained MQTT capability messages
+     - Closes broadcaster connection cleanly
+   - **Second signal**: Forces immediate exit
+     - Terminates worker immediately without cleanup
+     - Use when graceful shutdown is taking too long
 
 ## Plugin System
 
@@ -221,14 +231,19 @@ Task Server integrates with cl_ml_tools plugin system:
 
 ### Database Migrations
 
-**Automatic Migrations:**
-- Migrations are automatically applied when the server starts
-- Server validates that `alembic/versions` directory exists and contains at least one migration
-- Server will fail to start if migrations cannot be run
+**Migration Command:**
 
-**Manual Migration Tasks (for development):**
+Users must run migrations BEFORE starting the server:
 
-**Important:** The `alembic/versions` directory must exist before creating new migrations:
+```bash
+uv run compute-migrate
+```
+
+This creates all required database tables. Only run when:
+- Setting up a new installation
+- After pulling changes with new migrations
+
+**Creating New Migrations (for developers):**
 
 ```bash
 # Create versions directory if needed
@@ -237,22 +252,25 @@ mkdir -p alembic/versions
 # Create a new migration after schema changes
 uv run alembic revision --autogenerate -m "description"
 
-# Manually apply migrations (not needed - server does this automatically)
-uv run alembic upgrade head
+# Users will run compute-migrate to apply the new migration
+```
 
-# Rollback one migration (development only)
-uv run alembic downgrade -1
+**Manual Alembic Commands (for development/debugging):**
 
+```bash
 # Check current migration version
 uv run alembic current
 
 # View migration history
 uv run alembic history
+
+# Rollback one migration (development only)
+uv run alembic downgrade -1
 ```
 
 **Note:**
-- Users do NOT need to run migrations manually - the server does this automatically
-- Developers only need to create new migrations when changing the schema
+- Server validates tables exist on startup - fails if migrations haven't been run
+- `compute-migrate` is a separate CLI tool (not part of server startup)
 - The `alembic/versions` directory must exist and contain at least one migration file
 
 ## Configuration

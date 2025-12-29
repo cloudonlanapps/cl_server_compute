@@ -24,14 +24,29 @@ from .database import SessionLocal
 
 logger = logging.getLogger("compute")
 
-# Global shutdown event
+# Global shutdown event and signal counter
 shutdown_event = asyncio.Event()
+shutdown_signal_count = 0
 
 
 def signal_handler(signum: int, _frame: FrameType | None) -> None:
-    """Handle shutdown signals (SIGINT, SIGTERM)."""
-    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-    shutdown_event.set()
+    """Handle shutdown signals (SIGINT, SIGTERM).
+
+    First signal: Initiates graceful shutdown
+    Second signal: Forces immediate exit
+    """
+    import sys
+    global shutdown_signal_count
+    shutdown_signal_count += 1
+
+    if shutdown_signal_count == 1:
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+        logger.info("Press Ctrl+C again to force immediate exit")
+        shutdown_event.set()
+    else:
+        # Use print to ensure message appears before exit
+        print(f"\nWARNING: Force exit requested, terminating immediately!", file=sys.stderr, flush=True)
+        sys.exit(1)
 
 
 class ComputeWorker:

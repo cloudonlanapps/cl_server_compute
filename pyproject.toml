@@ -30,6 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
+compute-migrate = "compute.migrate:main"
 compute-server = "compute.compute_server:main"
 compute-worker = "compute.compute_worker:main"
 

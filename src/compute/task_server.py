@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
     _ = app
-    # Startup: run database migrations
-    from .database import run_migrations
+    # Startup: validate database tables exist
+    from .database import check_tables_exist
 
-    run_migrations()
+    check_tables_exist()
 
     yield
     # Shutdown: cleanup capability manager

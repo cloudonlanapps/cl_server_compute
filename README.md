@@ -20,32 +20,24 @@ uv sync
 
 # Or install with development dependencies
 uv sync --all-extras
+
+# Run database migrations (required before first use)
+uv run compute-migrate
 ```
 
 ### Database Setup
 
-Initialize the database with Alembic migrations:
+**Before starting the server**, run database migrations:
 
 ```bash
-# Create the versions directory (if it doesn't exist)
-mkdir -p alembic/versions
-
-# Apply database migrations
-uv run alembic upgrade head
-
-# Optional: Check current migration version
-uv run alembic current
+uv run compute-migrate
 ```
 
-**Note:** The `alembic/versions` directory must exist before running migrations. If you need to create a new migration after schema changes:
+This creates all required database tables. You only need to run this:
+- **Once** when setting up a new installation
+- **After pulling** changes that include new database migrations
 
-```bash
-# Generate a new migration
-uv run alembic revision --autogenerate -m "description of changes"
-
-# Apply the new migration
-uv run alembic upgrade head
-```
+The server will refuse to start if migrations haven't been run, showing a clear error message.
 
 ### Running the Server
 
@@ -95,6 +87,10 @@ uv run compute-worker --worker-id worker-2 &
 - `--port, -p` - Compute server port on localhost (default: 8002, env: COMPUTE_SERVER_PORT)
 - `--tasks, -t` - Comma-separated task types to process (default: all available)
 - `--log-level, -l` - Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
+
+**Worker Shutdown:**
+- **First Ctrl+C**: Graceful shutdown (completes current job, cleans up)
+- **Second Ctrl+C**: Force immediate exit (no cleanup)
 
 ## Environment Variables
 
