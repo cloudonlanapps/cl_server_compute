@@ -73,7 +73,7 @@ asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]
-addopts = "--cov=compute --cov-report=html --cov-report=term-missing --cov-fail-under=84"
+addopts = "--cov=compute --cov-report=html --cov-report=term-missing --cov-fail-under=90"
 
 [tool.coverage.run]
 source = ["src/compute"]
