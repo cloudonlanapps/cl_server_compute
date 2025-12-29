@@ -1,9 +1,15 @@
 """Utility functions for compute service."""
 
+import logging
 import os
 import socket
 import sys
 from pathlib import Path
+
+from alembic import command
+from alembic.config import Config as AlembicConfig
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_cl_server_dir() -> Path:
@@ -156,3 +162,65 @@ def ensure_server_running(host: str, port: int) -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+
+def run_migrations() -> None:
+    """Run Alembic migrations to ensure database schema is up to date.
+
+    This function should be called on server/worker startup to automatically
+    apply any pending migrations.
+
+    Raises:
+        FileNotFoundError: If alembic.ini, versions directory, or migrations not found
+        RuntimeError: If migrations fail to run
+    """
+    # Find alembic.ini in the package directory
+    package_dir = Path(__file__).parent.parent.parent
+    alembic_ini = package_dir / "alembic.ini"
+
+    if not alembic_ini.exists():
+        msg = (
+            f"alembic.ini not found at {alembic_ini}\n"
+            "Database migrations cannot be run without alembic configuration."
+        )
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+    # Check versions directory exists
+    versions_dir = package_dir / "alembic" / "versions"
+    if not versions_dir.exists():
+        msg = (
+            f"Alembic versions directory not found at {versions_dir}\n"
+            "Please create it with: mkdir -p alembic/versions"
+        )
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+    # Check that at least one migration exists
+    migration_files = list(versions_dir.glob("*.py"))
+    # Filter out __pycache__ and __init__.py
+    migration_files = [f for f in migration_files if f.name != "__init__.py"]
+    if not migration_files:
+        msg = (
+            f"No migration files found in {versions_dir}\n"
+            "Please create an initial migration with:\n"
+            "  uv run alembic revision --autogenerate -m 'initial schema'"
+        )
+        logger.error(msg)
+        raise FileNotFoundError(msg)
+
+    # Create Alembic config and run migrations
+    alembic_cfg = AlembicConfig(str(alembic_ini))
+    alembic_cfg.set_main_option("script_location", str(package_dir / "alembic"))
+    # Prevent alembic from reconfiguring logging
+    alembic_cfg.attributes["configure_logger"] = False
+
+    try:
+        logger.info("Running database migrations...")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations completed successfully")
+        print("INFO:     Database migrations completed successfully", file=sys.stderr, flush=True)
+    except Exception as e:
+        msg = f"Failed to run database migrations: {e}"
+        logger.error(msg)
+        raise RuntimeError(msg) from e

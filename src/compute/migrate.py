@@ -13,7 +13,7 @@ def main() -> int:
     print("Running database migrations...")
 
     # Ensure CL_SERVER_DIR exists before running migrations
-    from .utils import ensure_cl_server_dir
+    from .utils import ensure_cl_server_dir, run_migrations
 
     try:
         ensure_cl_server_dir()
@@ -21,7 +21,6 @@ def main() -> int:
         return 1
 
     # Run migrations
-    from .database import run_migrations
 
     try:
         run_migrations()

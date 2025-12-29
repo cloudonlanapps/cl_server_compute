@@ -86,6 +86,7 @@ omit = [
     "*/compute_server.py",  # CLI entry point, not tested
     "*/compute_worker.py",  # CLI entry point, not tested
     "*/migrate.py",  # Migration utility script, not tested
+    "*/utils.py",  # CLI startup utilities, tested manually
 ]
 
 [tool.coverage.report]
