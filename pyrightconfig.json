@@ -3,7 +3,12 @@
   "venv": ".venv",
   "reportMissingTypeStubs": true,
   "ignore": [],
-  "include": ["src"],
+  "include": [
+    "src",
+    "tests"
+  ],
   "reportCallInDefaultInitializer": "none",
-  "extraPaths": ["src"],
+  "extraPaths": [
+    "src"
+  ]
 }

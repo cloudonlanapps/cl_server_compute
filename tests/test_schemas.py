@@ -15,7 +15,15 @@ class TestJobResponse:
             job_id="test-job-1",
             task_type="test_task",
             status="queued",
+            progress=0,
+            params={},
+            task_output=None,
+            error_message=None,
+            priority=5,
             created_at=1234567890000,
+            updated_at=None,
+            started_at=None,
+            completed_at=None,
         )
 
         assert job.job_id == "test-job-1"
@@ -69,8 +77,13 @@ class TestJobResponse:
             status="failed",
             progress=50,
             params={"input": "test.jpg"},
+            task_output=None,
             error_message="File not found",
             created_at=1234567890000,
+            priority=5,
+            updated_at=None,
+            started_at=None,
+            completed_at=None,
         )
 
         assert job.status == "failed"
@@ -80,13 +93,15 @@ class TestJobResponse:
     def test_job_response_missing_required_fields(self):
         """Test that JobResponse requires job_id, task_type, status, and created_at."""
         with pytest.raises(ValidationError):
-            JobResponse()
+            _ = JobResponse.model_validate({})
 
         with pytest.raises(ValidationError):
-            JobResponse(job_id="test-id")
+            data = {"job_id": "test-id"}
+            _ = JobResponse.model_validate(data)
 
         with pytest.raises(ValidationError):
-            JobResponse(job_id="test-id", task_type="test_task")
+            data2 = {"job_id": "test-id", "task_type": "test_task"}
+            _ = JobResponse.model_validate(data2)
 
     def test_job_response_nested_params(self):
         """Test JobResponse with nested params structure."""
@@ -94,6 +109,7 @@ class TestJobResponse:
             job_id="test-job-4",
             task_type="complex_task",
             status="in_progress",
+            progress=0,
             params={
                 "config": {
                     "nested": {"value": 123},
@@ -101,11 +117,21 @@ class TestJobResponse:
                 },
                 "flags": [True, False, True],
             },
+            task_output=None,
+            error_message=None,
+            priority=5,
             created_at=1234567890000,
+            updated_at=None,
+            started_at=None,
+            completed_at=None,
         )
 
-        assert job.params["config"]["nested"]["value"] == 123
-        assert job.params["config"]["list"] == [1, 2, 3]
+        config = job.params["config"]
+        assert isinstance(config, dict)
+        nested = config["nested"]
+        assert isinstance(nested, dict)
+        assert nested["value"] == 123
+        assert config["list"] == [1, 2, 3]
         assert job.params["flags"] == [True, False, True]
 
 
@@ -135,13 +161,13 @@ class TestStorageInfo:
     def test_storage_info_missing_fields(self):
         """Test that StorageInfo requires both fields."""
         with pytest.raises(ValidationError):
-            StorageInfo()
+            _ = StorageInfo.model_validate({})
 
         with pytest.raises(ValidationError):
-            StorageInfo(total_size=100)
+            _ = StorageInfo.model_validate({"total_size": 100})
 
         with pytest.raises(ValidationError):
-            StorageInfo(job_count=10)
+            _ = StorageInfo.model_validate({"job_count": 10})
 
 
 class TestCleanupResult:
@@ -170,10 +196,10 @@ class TestCleanupResult:
     def test_cleanup_result_missing_fields(self):
         """Test that CleanupResult requires both fields."""
         with pytest.raises(ValidationError):
-            CleanupResult()
+            _ = CleanupResult.model_validate({})
 
         with pytest.raises(ValidationError):
-            CleanupResult(deleted_count=5)
+            _ = CleanupResult.model_validate({"deleted_count": 5})
 
         with pytest.raises(ValidationError):
-            CleanupResult(freed_space=1000)
+            _ = CleanupResult.model_validate({"freed_space": 1000})

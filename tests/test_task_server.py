@@ -1,6 +1,6 @@
 """Tests for FastAPI application."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +9,7 @@ from compute.task_server import app
 
 
 @pytest.fixture
-def client():
+def client() -> TestClient:
     """Create test client."""
     return TestClient(app)
 
@@ -26,7 +26,7 @@ class TestTaskServerApp:
     def test_app_includes_routers(self):
         """Test that app includes required routers."""
         # Check that routes are registered
-        routes = [route.path for route in app.routes]
+        routes = [getattr(route, "path") for route in app.routes if hasattr(route, "path")]
 
         # Job management routes
         assert "/jobs/{job_id}" in routes
@@ -41,7 +41,7 @@ class TestTaskServerApp:
         # Root route
         assert "/" in routes
 
-    def test_root_endpoint(self, client):
+    def test_root_endpoint(self, client: TestClient):
         """Test root health check endpoint."""
         response = client.get("/")
 
@@ -51,7 +51,7 @@ class TestTaskServerApp:
         assert data["service"] == "Task Server"
         assert data["version"] == "v1"
 
-    def test_root_response_schema(self, client):
+    def test_root_response_schema(self, client: TestClient):
         """Test root endpoint response matches schema."""
         response = client.get("/")
 
@@ -63,21 +63,20 @@ class TestTaskServerApp:
         assert isinstance(data["service"], str)
         assert isinstance(data["version"], str)
 
-    def test_http_exception_handler(self, client):
+    def test_http_exception_handler(self, client: TestClient):
         """Test HTTP exception handler preserves error format."""
         # Try to access non-existent job (will trigger HTTPException)
         with patch("compute.service.JobService.get_job") as mock_get_job:
             from fastapi import HTTPException
 
-            mock_get_job.side_effect = HTTPException(
-                status_code=404, detail="Job not found"
-            )
+            mock_get_job.side_effect = HTTPException(status_code=404, detail="Job not found")
 
             # Override dependencies to allow test to run
-            from compute.database import get_db
+            from cl_server_shared.models import Base
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
-            from cl_server_shared.models import Base
+
+            from compute.database import get_db
 
             engine = create_engine("sqlite:///:memory:")
             Base.metadata.create_all(engine)
@@ -103,9 +102,7 @@ class TestTaskServerApp:
 
         from compute.task_server import lifespan
 
-        with patch(
-            "compute.capability_manager.close_capability_manager"
-        ) as mock_close:
+        with patch("compute.capability_manager.close_capability_manager") as mock_close:
             # Test lifespan context manager shutdown
             async def run_lifespan():
                 async with lifespan(app):
@@ -125,7 +122,7 @@ class TestTaskServerApp:
         # app should include: main router + plugin router
         assert len(app.router.routes) > 0
 
-    def test_openapi_schema_generated(self, client):
+    def test_openapi_schema_generated(self, client: TestClient):
         """Test that OpenAPI schema is generated."""
         response = client.get("/openapi.json")
 
@@ -136,7 +133,7 @@ class TestTaskServerApp:
         assert schema["info"]["title"] == "Task Server"
         assert schema["info"]["version"] == "v1"
 
-    def test_openapi_paths_exist(self, client):
+    def test_openapi_paths_exist(self, client: TestClient):
         """Test that expected paths exist in OpenAPI schema."""
         response = client.get("/openapi.json")
         schema = response.json()
@@ -148,7 +145,7 @@ class TestTaskServerApp:
         assert "/admin/jobs/storage/size" in paths
         assert "/admin/jobs/cleanup" in paths
 
-    def test_openapi_operations(self, client):
+    def test_openapi_operations(self, client: TestClient):
         """Test that operations have correct operation IDs."""
         response = client.get("/openapi.json")
         schema = response.json()
@@ -157,21 +154,13 @@ class TestTaskServerApp:
         assert schema["paths"]["/"]["get"]["operationId"] == "root_get"
 
         # Check job endpoints
-        assert (
-            schema["paths"]["/jobs/{job_id}"]["get"]["operationId"] == "get_job"
-        )
-        assert (
-            schema["paths"]["/jobs/{job_id}"]["delete"]["operationId"]
-            == "delete_job"
-        )
+        assert schema["paths"]["/jobs/{job_id}"]["get"]["operationId"] == "get_job"
+        assert schema["paths"]["/jobs/{job_id}"]["delete"]["operationId"] == "delete_job"
 
         # Check capability endpoint
-        assert (
-            schema["paths"]["/capabilities"]["get"]["operationId"]
-            == "get_worker_capabilities"
-        )
+        assert schema["paths"]["/capabilities"]["get"]["operationId"] == "get_worker_capabilities"
 
-    def test_app_tags(self, client):
+    def test_app_tags(self, client: TestClient):
         """Test that endpoints are tagged correctly."""
         response = client.get("/openapi.json")
         schema = response.json()

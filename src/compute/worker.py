@@ -41,7 +41,7 @@ class ComputeWorker:
         self,
         worker_id: str,
         supported_tasks: list[str] | None = None,
-        poll_interval: int = Config.WORKER_POLL_INTERVAL,
+        poll_interval: float = Config.WORKER_POLL_INTERVAL,
     ):
         """Initialize compute worker.
 
@@ -51,7 +51,7 @@ class ComputeWorker:
             poll_interval: Seconds to sleep when no jobs available
         """
         self.worker_id: str = worker_id
-        self.poll_interval: int = poll_interval
+        self.poll_interval: float = poll_interval
 
         # Create repository and storage adapters
         self.repository: JobRepositoryService = JobRepositoryService(SessionLocal)

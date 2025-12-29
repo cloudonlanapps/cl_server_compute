@@ -21,8 +21,8 @@ class TestEnableWalMode:
     def test_enable_wal_mode(self):
         """Test that WAL mode and pragmas are set correctly."""
         # Create mock cursor and connection
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
+        mock_cursor: MagicMock = MagicMock()
+        mock_conn: MagicMock = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
         # Call enable_wal_mode
@@ -40,9 +40,9 @@ class TestEnableWalMode:
 
     def test_enable_wal_mode_closes_cursor(self):
         """Test that cursor is closed even if exception occurs."""
-        mock_cursor = MagicMock()
+        mock_cursor: MagicMock = MagicMock()
         mock_cursor.execute.side_effect = Exception("Test error")
-        mock_conn = MagicMock()
+        mock_conn: MagicMock = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
         # Call should not raise, but cursor should still be closed
@@ -79,7 +79,7 @@ class TestCreateDbEngine:
         database_url = "sqlite:///:memory:"
 
         with patch("compute.database.event.listen") as mock_listen:
-            engine = create_db_engine(database_url)
+            _ = create_db_engine(database_url)
 
             # Verify enable_wal_mode was registered as a listener
             # SQLAlchemy may call event.listen multiple times for internal purposes
@@ -94,7 +94,7 @@ class TestCreateDbEngine:
         with patch("compute.database.event.listen") as mock_listen:
             # This will fail to connect, but we only care about listener registration
             try:
-                engine = create_db_engine(database_url)
+                _ = create_db_engine(database_url)
             except Exception:
                 pass  # Connection failure is expected for this test
 
@@ -146,7 +146,7 @@ class TestGetDbSession:
 
         # Clean up
         try:
-            next(generator)
+            _ = next(generator)
         except StopIteration:
             pass
 
@@ -155,8 +155,7 @@ class TestGetDbSession:
         engine = create_engine("sqlite:///:memory:")
         factory = create_session_factory(engine)
 
-        session = None
-        for session in get_db_session(factory):
+        for _ in get_db_session(factory):
             pass  # Session is yielded
 
         # After generator completes, session should be closed
@@ -168,7 +167,7 @@ class TestGetDbSession:
         factory = create_session_factory(engine)
 
         try:
-            for session in get_db_session(factory):
+            for _ in get_db_session(factory):
                 raise ValueError("Test exception")
         except ValueError:
             pass  # Expected
@@ -189,7 +188,7 @@ class TestGetDb:
 
         # Clean up
         try:
-            next(generator)
+            _ = next(generator)
         except StopIteration:
             pass
 

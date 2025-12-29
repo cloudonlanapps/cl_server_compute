@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown."""
+    _ = app
     # Startup: nothing to do currently
     yield
     # Shutdown: cleanup capability manager

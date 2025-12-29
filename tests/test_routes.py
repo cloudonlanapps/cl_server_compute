@@ -1,21 +1,23 @@
 """Tests for API routes."""
 
+from collections.abc import Generator
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
+from cl_server_shared.models import Base, Job
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from cl_server_shared.models import Base, Job
 from compute.auth import UserPayload
 from compute.routes import router
 from compute.schemas import CleanupResult, JobResponse, StorageInfo
 
 
 @pytest.fixture
-def test_db():
+def test_db() -> Generator[Session, None, None]:
     """Create test database."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -27,7 +29,7 @@ def test_db():
 
 
 @pytest.fixture
-def app():
+def app() -> FastAPI:
     """Create test FastAPI app."""
     test_app = FastAPI()
     test_app.include_router(router)
@@ -35,13 +37,13 @@ def app():
 
 
 @pytest.fixture
-def client(app):
+def client(app: FastAPI) -> TestClient:
     """Create test client."""
     return TestClient(app)
 
 
 @pytest.fixture
-def mock_user():
+def mock_user() -> UserPayload:
     """Create mock authenticated user."""
     return UserPayload(
         sub="test_user",
@@ -51,7 +53,7 @@ def mock_user():
 
 
 @pytest.fixture
-def mock_admin():
+def mock_admin() -> UserPayload:
     """Create mock admin user."""
     return UserPayload(
         sub="admin_user",
@@ -63,11 +65,11 @@ def mock_admin():
 class TestGetJob:
     """Tests for GET /jobs/{job_id} endpoint."""
 
-    def test_get_job_success(self, client, test_db, mock_user):
+    def test_get_job_success(self, client: TestClient, test_db: Session, mock_user: UserPayload):
         """Test getting a job successfully."""
         from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
         # Mock JobService.get_job to return a JobResponse
@@ -83,6 +85,9 @@ class TestGetJob:
                     created_at=1234567890000,
                     updated_at=1234567890000,
                     priority=5,
+                    error_message=None,
+                    started_at=None,
+                    completed_at=None,
                 )
 
                 response = client.get("/jobs/test-job-1")
@@ -96,12 +101,13 @@ class TestGetJob:
                 # Clean up
                 app.dependency_overrides.clear()
 
-    def test_get_job_not_found(self, client, test_db, mock_user):
+    def test_get_job_not_found(self, client: TestClient, test_db: Session, mock_user: UserPayload):
         """Test getting a non-existent job."""
-        from compute.database import get_db
         from fastapi import HTTPException
 
-        app = client.app
+        from compute.database import get_db
+
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
         with patch("compute.auth.Config.AUTH_DISABLED", True):
@@ -118,13 +124,14 @@ class TestGetJob:
                 # Clean up
                 app.dependency_overrides.clear()
 
-    def test_get_job_requires_auth(self, client, test_db):
+    def test_get_job_requires_auth(self, client: TestClient, test_db: Session):
         """Test that get_job requires authentication."""
-        from compute.database import get_db
-        from compute.auth import require_permission
         from fastapi import HTTPException
 
-        app = client.app
+        from compute.auth import require_permission
+        from compute.database import get_db
+
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
         def mock_auth():
@@ -140,7 +147,7 @@ class TestGetJob:
 class TestDeleteJob:
     """Tests for DELETE /jobs/{job_id} endpoint."""
 
-    def test_delete_job_success(self, client, test_db, mock_user):
+    def test_delete_job_success(self, client: TestClient, test_db: Session, mock_user: UserPayload):
         """Test deleting a job successfully."""
         # Create test job
         job = Job(
@@ -170,16 +177,20 @@ class TestDeleteJob:
                     mock_repo.delete_job.return_value = None
                     mock_repo_class.return_value = mock_repo
 
-                    client.app.dependency_overrides[get_db] = get_test_db
+                    app = cast(FastAPI, client.app)
+                    app.dependency_overrides[get_db] = get_test_db
 
                     response = client.delete("/jobs/test-job-2")
 
                     assert response.status_code == 204
 
                     # Clean up
-                    client.app.dependency_overrides.clear()
+                    app = cast(FastAPI, client.app)
+                    app.dependency_overrides.clear()
 
-    def test_delete_job_not_found(self, client, test_db, mock_user):
+    def test_delete_job_not_found(
+        self, client: TestClient, test_db: Session, mock_user: UserPayload
+    ):
         """Test deleting a non-existent job."""
         from compute.database import get_db
 
@@ -192,25 +203,29 @@ class TestDeleteJob:
                 mock_repo.get_job.return_value = None
                 mock_repo_class.return_value = mock_repo
 
-                client.app.dependency_overrides[get_db] = get_test_db
+                app = cast(FastAPI, client.app)
+                app.dependency_overrides[get_db] = get_test_db
 
                 response = client.delete("/jobs/nonexistent-job")
 
                 assert response.status_code == 404
 
                 # Clean up
-                client.app.dependency_overrides.clear()
+                app = cast(FastAPI, client.app)
+                app.dependency_overrides.clear()
 
 
 class TestGetStorageSize:
     """Tests for GET /admin/jobs/storage/size endpoint."""
 
-    def test_get_storage_size_success(self, client, test_db, mock_admin):
+    def test_get_storage_size_success(
+        self, client: TestClient, test_db: Session, mock_admin: UserPayload
+    ):
         """Test getting storage size as admin."""
-        from compute.database import get_db
         from compute.auth import require_admin
+        from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
         app.dependency_overrides[require_admin] = lambda: mock_admin
 
@@ -227,13 +242,16 @@ class TestGetStorageSize:
             assert data["total_size"] == 1024000
             assert data["job_count"] == 42
 
-    def test_get_storage_size_requires_admin(self, client, test_db, mock_user):
+    def test_get_storage_size_requires_admin(
+        self, client: TestClient, test_db: Session, mock_user: UserPayload
+    ):
         """Test that storage size endpoint requires admin."""
-        from compute.database import get_db
-        from compute.auth import require_admin
         from fastapi import HTTPException
 
-        app = client.app
+        from compute.auth import require_admin
+        from compute.database import get_db
+
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
         def mock_admin_check():
@@ -249,12 +267,14 @@ class TestGetStorageSize:
 class TestCleanupOldJobs:
     """Tests for DELETE /admin/jobs/cleanup endpoint."""
 
-    def test_cleanup_old_jobs_success(self, client, test_db, mock_admin):
+    def test_cleanup_old_jobs_success(
+        self, client: TestClient, test_db: Session, mock_admin: UserPayload
+    ):
         """Test cleanup old jobs as admin."""
-        from compute.database import get_db
         from compute.auth import require_admin
+        from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
         app.dependency_overrides[require_admin] = lambda: mock_admin
 
@@ -271,12 +291,14 @@ class TestCleanupOldJobs:
             assert data["deleted_count"] == 10
             assert data["freed_space"] == 5242880
 
-    def test_cleanup_old_jobs_custom_days(self, client, test_db, mock_admin):
+    def test_cleanup_old_jobs_custom_days(
+        self, client: TestClient, test_db: Session, mock_admin: UserPayload
+    ):
         """Test cleanup with custom days parameter."""
-        from compute.database import get_db
         from compute.auth import require_admin
+        from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
         app.dependency_overrides[require_admin] = lambda: mock_admin
 
@@ -291,13 +313,16 @@ class TestCleanupOldJobs:
             assert response.status_code == 200
             mock_cleanup.assert_called_once_with(30)
 
-    def test_cleanup_old_jobs_requires_admin(self, client, test_db, mock_user):
+    def test_cleanup_old_jobs_requires_admin(
+        self, client: TestClient, test_db: Session, mock_user: UserPayload
+    ):
         """Test that cleanup endpoint requires admin."""
-        from compute.database import get_db
-        from compute.auth import require_admin
         from fastapi import HTTPException
 
-        app = client.app
+        from compute.auth import require_admin
+        from compute.database import get_db
+
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
         def mock_admin_check():
@@ -313,19 +338,15 @@ class TestCleanupOldJobs:
 class TestGetWorkerCapabilities:
     """Tests for GET /capabilities endpoint."""
 
-    def test_get_worker_capabilities_success(self, client, test_db):
+    def test_get_worker_capabilities_success(self, client: TestClient, test_db: Session):
         """Test getting worker capabilities."""
         from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
-        with patch(
-            "compute.service.CapabilityService.get_available_capabilities"
-        ) as mock_get_caps:
-            with patch(
-                "compute.service.CapabilityService.get_worker_count"
-            ) as mock_get_count:
+        with patch("compute.service.CapabilityService.get_available_capabilities") as mock_get_caps:
+            with patch("compute.service.CapabilityService.get_worker_count") as mock_get_count:
                 mock_get_caps.return_value = {
                     "image_resize": 2,
                     "image_conversion": 1,
@@ -340,19 +361,15 @@ class TestGetWorkerCapabilities:
                 assert data["capabilities"]["image_resize"] == 2
                 assert data["capabilities"]["image_conversion"] == 1
 
-    def test_get_worker_capabilities_no_workers(self, client, test_db):
+    def test_get_worker_capabilities_no_workers(self, client: TestClient, test_db: Session):
         """Test getting capabilities when no workers available."""
         from compute.database import get_db
 
-        app = client.app
+        app = cast(FastAPI, client.app)
         app.dependency_overrides[get_db] = lambda: iter([test_db])
 
-        with patch(
-            "compute.service.CapabilityService.get_available_capabilities"
-        ) as mock_get_caps:
-            with patch(
-                "compute.service.CapabilityService.get_worker_count"
-            ) as mock_get_count:
+        with patch("compute.service.CapabilityService.get_available_capabilities") as mock_get_caps:
+            with patch("compute.service.CapabilityService.get_worker_count") as mock_get_count:
                 mock_get_caps.return_value = {}
                 mock_get_count.return_value = 0
 

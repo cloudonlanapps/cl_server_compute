@@ -1,9 +1,8 @@
 """Tests for capability broadcaster."""
 
 import json
+from typing import cast
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from compute.capability_broadcaster import CapabilityBroadcaster
 
@@ -27,7 +26,7 @@ class TestCapabilityBroadcaster:
     def test_init_mqtt_broadcaster(self):
         """Test initializing MQTT broadcaster."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
-            mock_broadcaster = MagicMock()
+            mock_broadcaster: MagicMock = MagicMock()
             mock_get_broadcaster.return_value = mock_broadcaster
 
             broadcaster = CapabilityBroadcaster(
@@ -43,9 +42,7 @@ class TestCapabilityBroadcaster:
 
     def test_init_mqtt_broadcaster_no_broadcaster(self):
         """Test init when get_broadcaster returns None."""
-        with patch(
-            "compute.capability_broadcaster.get_broadcaster", return_value=None
-        ):
+        with patch("compute.capability_broadcaster.get_broadcaster", return_value=None):
             broadcaster = CapabilityBroadcaster(
                 worker_id="worker-1",
                 active_tasks={"image_resize"},
@@ -58,7 +55,7 @@ class TestCapabilityBroadcaster:
     def test_publish_success(self):
         """Test publishing capabilities successfully."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
-            mock_broadcaster = MagicMock()
+            mock_broadcaster: MagicMock = MagicMock()
             mock_broadcaster.publish_retained.return_value = True
             mock_get_broadcaster.return_value = mock_broadcaster
 
@@ -79,9 +76,13 @@ class TestCapabilityBroadcaster:
 
             # Verify payload structure
             payload = call_args[1]["payload"]
-            data = json.loads(payload)
+            assert isinstance(payload, str)
+            data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["id"] == "worker-1"
-            assert set(data["capabilities"]) == {"image_resize", "image_conversion"}
+            assert set(cast(list[str], data["capabilities"])) == {
+                "image_resize",
+                "image_conversion",
+            }
             assert data["idle_count"] == 1  # is_idle is True by default
             assert "timestamp" in data
 
@@ -104,7 +105,8 @@ class TestCapabilityBroadcaster:
             # Verify payload has idle_count=0
             call_args = mock_broadcaster.publish_retained.call_args
             payload = call_args[1]["payload"]
-            data = json.loads(payload)
+            assert isinstance(payload, str)
+            data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["idle_count"] == 0
 
     def test_publish_failure(self):
@@ -199,7 +201,7 @@ class TestCapabilityBroadcaster:
     def test_publish_with_empty_tasks(self):
         """Test publishing with no active tasks."""
         with patch("compute.capability_broadcaster.get_broadcaster") as mock_get_broadcaster:
-            mock_broadcaster = MagicMock()
+            mock_broadcaster: MagicMock = MagicMock()
             mock_broadcaster.publish_retained.return_value = True
             mock_get_broadcaster.return_value = mock_broadcaster
 
@@ -213,7 +215,8 @@ class TestCapabilityBroadcaster:
 
             call_args = mock_broadcaster.publish_retained.call_args
             payload = call_args[1]["payload"]
-            data = json.loads(payload)
+            assert isinstance(payload, str)
+            data: dict[str, object] = cast(dict[str, object], json.loads(payload))
             assert data["capabilities"] == []
 
     def test_idle_state_toggle(self):
@@ -229,26 +232,22 @@ class TestCapabilityBroadcaster:
             )
             broadcaster.init()
 
-            # Initially idle
             assert broadcaster.is_idle is True
             broadcaster.publish()
-            payload1 = json.loads(
-                mock_broadcaster.publish_retained.call_args[1]["payload"]
-            )
-            assert payload1["idle_count"] == 1
+            payload1 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            data1: dict[str, object] = cast(dict[str, object], json.loads(payload1))
+            assert data1["idle_count"] == 1
 
             # Set to busy
             broadcaster.is_idle = False
             broadcaster.publish()
-            payload2 = json.loads(
-                mock_broadcaster.publish_retained.call_args[1]["payload"]
-            )
-            assert payload2["idle_count"] == 0
+            payload2 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            data2: dict[str, object] = cast(dict[str, object], json.loads(payload2))
+            assert data2["idle_count"] == 0
 
             # Set back to idle
             broadcaster.is_idle = True
             broadcaster.publish()
-            payload3 = json.loads(
-                mock_broadcaster.publish_retained.call_args[1]["payload"]
-            )
-            assert payload3["idle_count"] == 1
+            payload3 = str(mock_broadcaster.publish_retained.call_args[1]["payload"])
+            data3: dict[str, object] = cast(dict[str, object], json.loads(payload3))
+            assert data3["idle_count"] == 1

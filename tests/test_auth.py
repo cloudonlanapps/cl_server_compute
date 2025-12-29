@@ -2,8 +2,7 @@
 
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -72,10 +71,12 @@ class TestUserPayload:
 
     def test_user_payload_extra_fields_ignored(self):
         """Test that extra fields are ignored."""
-        user = UserPayload(
-            sub="user999",
-            permissions=[],
-            extra_field="ignored",  # type: ignore
+        user = UserPayload.model_validate(
+            {
+                "sub": "user999",
+                "permissions": [],
+                "extra_field": "ignored",
+            }
         )
 
         assert user.sub == "user999"
@@ -84,7 +85,7 @@ class TestUserPayload:
     def test_user_payload_missing_required_field(self):
         """Test that missing required field raises ValidationError."""
         with pytest.raises(ValidationError):
-            UserPayload(permissions=[])  # type: ignore
+            _ = UserPayload.model_validate({"permissions": []})
 
 
 class TestGetPublicKey:
@@ -96,7 +97,7 @@ class TestGetPublicKey:
         test_key = "-----BEGIN PUBLIC KEY-----\ntest_key\n-----END PUBLIC KEY-----"
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
-            tmp.write(test_key)
+            _ = tmp.write(test_key)
             tmp_path = tmp.name
 
         try:
@@ -132,7 +133,7 @@ class TestGetPublicKey:
                 compute.auth._public_key_cache = None
 
                 with pytest.raises(HTTPException) as exc_info:
-                    await get_public_key()
+                    _ = await get_public_key()
 
                 assert exc_info.value.status_code == 500
                 assert "Public key not found" in exc_info.value.detail
@@ -146,7 +147,7 @@ class TestGetPublicKey:
     async def test_get_public_key_empty_file(self):
         """Test public key loading with empty file."""
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
-            tmp.write("")  # Empty file
+            _ = tmp.write("")  # Empty file
             tmp_path = tmp.name
 
         try:
@@ -158,7 +159,7 @@ class TestGetPublicKey:
                     compute.auth._public_key_cache = None
 
                     with pytest.raises(HTTPException) as exc_info:
-                        await get_public_key()
+                        _ = await get_public_key()
 
                     assert exc_info.value.status_code == 500
         finally:
@@ -189,9 +190,9 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_get_current_user_valid_token(self):
         """Test get_current_user with valid JWT token."""
+        from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import ec
-        from cryptography.hazmat.backends import default_backend
 
         # Generate test key pair
         private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
@@ -233,7 +234,7 @@ class TestGetCurrentUser:
         with patch("compute.auth.Config.AUTH_DISABLED", False):
             with patch("compute.auth.get_public_key", return_value=public_key):
                 with pytest.raises(HTTPException) as exc_info:
-                    await get_current_user(token="invalid.token.here")
+                    _ = await get_current_user(token="invalid.token.here")
 
                 assert exc_info.value.status_code == 401
                 assert "Could not validate credentials" in exc_info.value.detail
@@ -258,7 +259,7 @@ class TestRequirePermission:
 
         with patch("compute.auth.Config.AUTH_DISABLED", False):
             with pytest.raises(HTTPException) as exc_info:
-                await checker(current_user=None)
+                _ = await checker(current_user=None)
 
             assert exc_info.value.status_code == 401
             assert "Authentication required" in exc_info.value.detail
@@ -303,7 +304,7 @@ class TestRequirePermission:
 
         with patch("compute.auth.Config.AUTH_DISABLED", False):
             with pytest.raises(HTTPException) as exc_info:
-                await checker(current_user=user)
+                _ = await checker(current_user=user)
 
             assert exc_info.value.status_code == 403
             assert "Insufficient permissions" in exc_info.value.detail
@@ -325,7 +326,7 @@ class TestRequireAdmin:
         """Test admin check when no user is authenticated."""
         with patch("compute.auth.Config.AUTH_DISABLED", False):
             with pytest.raises(HTTPException) as exc_info:
-                await require_admin(current_user=None)
+                _ = await require_admin(current_user=None)
 
             assert exc_info.value.status_code == 401
             assert "Authentication required" in exc_info.value.detail
@@ -354,7 +355,7 @@ class TestRequireAdmin:
 
         with patch("compute.auth.Config.AUTH_DISABLED", False):
             with pytest.raises(HTTPException) as exc_info:
-                await require_admin(current_user=user)
+                _ = await require_admin(current_user=user)
 
             assert exc_info.value.status_code == 403
             assert "Admin access required" in exc_info.value.detail

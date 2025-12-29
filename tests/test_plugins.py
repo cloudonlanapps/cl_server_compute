@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from compute.plugins import create_compute_plugin_router
 
 
@@ -14,7 +12,7 @@ class TestCreateComputePluginRouter:
         """Test creating plugin router."""
         with patch("compute.plugins.create_master_router") as mock_create_router:
             with patch("compute.plugins.JobRepositoryService") as mock_repo:
-                with patch("compute.plugins.JobStorageService") as mock_storage:
+                with patch("compute.plugins.JobStorageService"):
                     mock_router = MagicMock()
                     mock_create_router.return_value = mock_router
                     mock_repository = MagicMock()
@@ -41,7 +39,7 @@ class TestCreateComputePluginRouter:
                         mock_router = MagicMock()
                         mock_create_router.return_value = mock_router
 
-                        create_compute_plugin_router()
+                        _ = create_compute_plugin_router()
 
                         # Verify JobRepositoryService was initialized with SessionLocal
                         mock_repo.assert_called_once_with(mock_session)
@@ -55,7 +53,7 @@ class TestCreateComputePluginRouter:
                         mock_router = MagicMock()
                         mock_create_router.return_value = mock_router
 
-                        create_compute_plugin_router()
+                        _ = create_compute_plugin_router()
 
                         # Verify JobStorageService was initialized with correct base_dir
                         mock_storage.assert_called_once_with(base_dir="/test/storage")
@@ -65,20 +63,16 @@ class TestCreateComputePluginRouter:
         with patch("compute.plugins.create_master_router") as mock_create_router:
             with patch("compute.plugins.JobRepositoryService"):
                 with patch("compute.plugins.JobStorageService"):
-                    with patch(
-                        "compute.plugins.require_permission"
-                    ) as mock_require_permission:
+                    with patch("compute.plugins.require_permission") as mock_require_permission:
                         mock_router = MagicMock()
                         mock_create_router.return_value = mock_router
                         mock_permission_checker = MagicMock()
                         mock_require_permission.return_value = mock_permission_checker
 
-                        create_compute_plugin_router()
+                        _ = create_compute_plugin_router()
 
                         # Verify require_permission was called with correct permission
-                        mock_require_permission.assert_called_once_with(
-                            "ai_inference_support"
-                        )
+                        mock_require_permission.assert_called_once_with("ai_inference_support")
 
                         # Verify the permission checker was passed to create_master_router
                         call_kwargs = mock_create_router.call_args[1]
