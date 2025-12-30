@@ -35,7 +35,7 @@ class UserPayload(BaseModel):
         strict=True,
     )
 
-    sub: str
+    id: str
     is_admin: bool = Field(default=False, strict=True)
     permissions: Permissions
 
@@ -118,7 +118,7 @@ async def get_current_user(
             token,
             public_key,
             algorithms=["ES256"],
-            options={"require": ["sub", "exp"]},
+            options={"require": ["id", "exp"]},
         )
         return UserPayload.model_validate(raw)
 
