@@ -67,3 +67,4 @@ class RootResponse(BaseModel):
     status: str = Field(..., description="Health status")
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
+    auth_required: bool = Field(..., description="Whether authentication is required")

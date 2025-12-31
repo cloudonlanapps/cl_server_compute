@@ -1,6 +1,7 @@
 """Task Server - Compute job and worker management service."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -62,4 +63,10 @@ async def validation_exception_handler(_request: Request, exc: HTTPException):
     operation_id="root_get",
 )
 async def root():
-    return RootResponse(status="healthy", service="Task Server", version="v1")
+    auth_required = os.getenv("AUTH_DISABLED", "false").lower() != "true"
+    return RootResponse(
+        status="healthy",
+        service="Task Server",
+        version="v1",
+        auth_required=auth_required,
+    )
