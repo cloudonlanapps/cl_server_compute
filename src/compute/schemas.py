@@ -61,6 +61,14 @@ class WorkerCapabilitiesResponse(BaseModel):
     capabilities: CapabilityStats = Field(..., description="Available capability counts")
 
 
+class ConfigResponse(BaseModel):
+    """Response schema for configuration endpoints."""
+
+    auth_enabled: bool = Field(..., description="Whether authentication is enabled")
+    updated_at: int | None = Field(None, description="Timestamp of last update (milliseconds)")
+    updated_by: str | None = Field(None, description="User ID who last updated the config")
+
+
 class RootResponse(BaseModel):
     """Response schema for root health check endpoint."""
 
@@ -68,3 +76,4 @@ class RootResponse(BaseModel):
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
     auth_required: bool = Field(..., description="Whether authentication is required")
+    guestMode: str = Field(..., description="Guest mode status (on/off)")

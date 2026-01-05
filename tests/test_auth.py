@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -16,6 +16,12 @@ from compute.auth import (
     require_admin,
     require_permission,
 )
+
+
+@pytest.fixture
+def mock_db():
+    """Mock database session for tests."""
+    return MagicMock()
 
 
 class TestUserPayload:
@@ -174,21 +180,23 @@ class TestGetCurrentUser:
     """Tests for get_current_user function."""
 
     @pytest.mark.asyncio
-    async def test_get_current_user_auth_disabled(self):
-        """Test get_current_user when auth is disabled."""
-        with patch("compute.auth.Config.AUTH_DISABLED", True):
-            user = await get_current_user(token="any-token")
+    async def test_get_current_user_auth_disabled(self, mock_db):
+        """Test get_current_user when auth is disabled (guest mode)."""
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = False  # Guest mode
+            user = await get_current_user(token="any-token", db=mock_db)
             assert user is None
 
     @pytest.mark.asyncio
-    async def test_get_current_user_no_token(self):
+    async def test_get_current_user_no_token(self, mock_db):
         """Test get_current_user with no token provided."""
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
-            user = await get_current_user(token=None)
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
+            user = await get_current_user(token=None, db=mock_db)
             assert user is None
 
     @pytest.mark.asyncio
-    async def test_get_current_user_valid_token(self):
+    async def test_get_current_user_valid_token(self, mock_db):
         """Test get_current_user with valid JWT token."""
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import serialization
@@ -217,9 +225,10 @@ class TestGetCurrentUser:
         }
         token = jwt.encode(payload, private_pem, algorithm="ES256")
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with patch("compute.auth.get_public_key", return_value=public_pem):
-                user = await get_current_user(token=token)
+                user = await get_current_user(token=token, db=mock_db)
 
                 assert user is not None
                 assert user.sub == "test_user"
@@ -227,14 +236,15 @@ class TestGetCurrentUser:
                 assert "ai_inference_support" in user.permissions
 
     @pytest.mark.asyncio
-    async def test_get_current_user_invalid_token(self):
+    async def test_get_current_user_invalid_token(self, mock_db):
         """Test get_current_user with invalid token."""
         public_key = "-----BEGIN PUBLIC KEY-----\nfake_key\n-----END PUBLIC KEY-----"
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with patch("compute.auth.get_public_key", return_value=public_key):
                 with pytest.raises(HTTPException) as exc_info:
-                    _ = await get_current_user(token="invalid.token.here")
+                    _ = await get_current_user(token="invalid.token.here", db=mock_db)
 
                 assert exc_info.value.status_code == 401
                 assert "Could not validate credentials" in exc_info.value.detail
@@ -244,28 +254,30 @@ class TestRequirePermission:
     """Tests for require_permission function."""
 
     @pytest.mark.asyncio
-    async def test_require_permission_auth_disabled(self):
-        """Test permission check when auth is disabled."""
+    async def test_require_permission_auth_disabled(self, mock_db):
+        """Test permission check when auth is disabled (guest mode)."""
         checker = require_permission("ai_inference_support")
 
-        with patch("compute.auth.Config.AUTH_DISABLED", True):
-            result = await checker(current_user=None)
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = False  # Guest mode
+            result = await checker(current_user=None, db=mock_db)
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_require_permission_no_user(self):
+    async def test_require_permission_no_user(self, mock_db):
         """Test permission check when no user is authenticated."""
         checker = require_permission("ai_inference_support")
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with pytest.raises(HTTPException) as exc_info:
-                _ = await checker(current_user=None)
+                _ = await checker(current_user=None, db=mock_db)
 
             assert exc_info.value.status_code == 401
             assert "Authentication required" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_require_permission_admin_user(self):
+    async def test_require_permission_admin_user(self, mock_db):
         """Test that admin users have all permissions."""
         checker = require_permission("ai_inference_support")
         admin_user = UserPayload(
@@ -274,12 +286,13 @@ class TestRequirePermission:
             permissions=[],
         )
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
-            result = await checker(current_user=admin_user)
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
+            result = await checker(current_user=admin_user, db=mock_db)
             assert result == admin_user
 
     @pytest.mark.asyncio
-    async def test_require_permission_user_has_permission(self):
+    async def test_require_permission_user_has_permission(self, mock_db):
         """Test user with required permission."""
         checker = require_permission("ai_inference_support")
         user = UserPayload(
@@ -288,12 +301,13 @@ class TestRequirePermission:
             permissions=["ai_inference_support"],
         )
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
-            result = await checker(current_user=user)
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
+            result = await checker(current_user=user, db=mock_db)
             assert result == user
 
     @pytest.mark.asyncio
-    async def test_require_permission_user_missing_permission(self):
+    async def test_require_permission_user_missing_permission(self, mock_db):
         """Test user without required permission."""
         checker = require_permission("admin")
         user = UserPayload(
@@ -302,9 +316,10 @@ class TestRequirePermission:
             permissions=["ai_inference_support"],
         )
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with pytest.raises(HTTPException) as exc_info:
-                _ = await checker(current_user=user)
+                _ = await checker(current_user=user, db=mock_db)
 
             assert exc_info.value.status_code == 403
             assert "Insufficient permissions" in exc_info.value.detail
@@ -315,24 +330,26 @@ class TestRequireAdmin:
     """Tests for require_admin function."""
 
     @pytest.mark.asyncio
-    async def test_require_admin_auth_disabled(self):
-        """Test admin check when auth is disabled."""
-        with patch("compute.auth.Config.AUTH_DISABLED", True):
-            result = await require_admin(current_user=None)
+    async def test_require_admin_auth_disabled(self, mock_db):
+        """Test admin check when auth is disabled (guest mode)."""
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = False  # Guest mode
+            result = await require_admin(current_user=None, db=mock_db)
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_require_admin_no_user(self):
+    async def test_require_admin_no_user(self, mock_db):
         """Test admin check when no user is authenticated."""
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with pytest.raises(HTTPException) as exc_info:
-                _ = await require_admin(current_user=None)
+                _ = await require_admin(current_user=None, db=mock_db)
 
             assert exc_info.value.status_code == 401
             assert "Authentication required" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_require_admin_admin_user(self):
+    async def test_require_admin_admin_user(self, mock_db):
         """Test admin check with admin user."""
         admin_user = UserPayload(
             sub="admin",
@@ -340,12 +357,13 @@ class TestRequireAdmin:
             permissions=["admin"],
         )
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
-            result = await require_admin(current_user=admin_user)
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
+            result = await require_admin(current_user=admin_user, db=mock_db)
             assert result == admin_user
 
     @pytest.mark.asyncio
-    async def test_require_admin_non_admin_user(self):
+    async def test_require_admin_non_admin_user(self, mock_db):
         """Test admin check with non-admin user."""
         user = UserPayload(
             sub="user",
@@ -353,9 +371,10 @@ class TestRequireAdmin:
             permissions=["ai_inference_support"],
         )
 
-        with patch("compute.auth.Config.AUTH_DISABLED", False):
+        with patch("compute.auth.ConfigService") as mock_config:
+            mock_config.return_value.get_auth_enabled.return_value = True  # Auth required
             with pytest.raises(HTTPException) as exc_info:
-                _ = await require_admin(current_user=user)
+                _ = await require_admin(current_user=user, db=mock_db)
 
             assert exc_info.value.status_code == 403
             assert "Admin access required" in exc_info.value.detail

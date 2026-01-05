@@ -1,12 +1,12 @@
 """Compute job management routes."""
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Form, Path, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .auth import UserPayload, require_admin, require_permission
 from .database import get_db
-from .schemas import CleanupResult, JobResponse, StorageInfo, WorkerCapabilitiesResponse
+from .schemas import CleanupResult, ConfigResponse, JobResponse, StorageInfo, WorkerCapabilitiesResponse
 from .service import CapabilityService, JobService
 
 router = APIRouter()
@@ -164,3 +164,79 @@ async def get_worker_capabilities(
         num_workers=num_workers,
         capabilities=capabilities,
     )
+
+
+# Admin configuration endpoints
+@router.get(
+    "/admin/config",
+    tags=["admin"],
+    summary="Get Configuration",
+    description="Get current service configuration. Requires admin access.",
+    operation_id="get_config_admin_config_get",
+    responses={200: {"model": ConfigResponse, "description": "Successful Response"}},
+)
+async def get_config(
+    db: Session = Depends(get_db),
+    user: UserPayload | None = Depends(require_admin),
+) -> ConfigResponse:
+    """Get current service configuration.
+
+    Requires admin access.
+    """
+    _ = user
+    from .config_service import ConfigService
+
+    config_service = ConfigService(db)
+
+    # Get config metadata
+    metadata = config_service.get_config_metadata("auth_enabled")
+
+    if metadata:
+        value_str = str(metadata["value"]) if metadata["value"] is not None else "false"
+        updated_at = metadata["updated_at"]
+        updated_by = metadata["updated_by"]
+        return ConfigResponse(
+            auth_enabled=value_str.lower() == "true",
+            updated_at=int(updated_at)
+            if updated_at is not None and not isinstance(updated_at, str)
+            else None,
+            updated_by=str(updated_by)
+            if updated_by is not None and not isinstance(updated_by, int)
+            else None,
+        )
+
+    # Default if not found
+    return ConfigResponse(auth_enabled=False, updated_at=None, updated_by=None)
+
+
+@router.put(
+    "/admin/config/auth",
+    tags=["admin"],
+    summary="Update Auth Configuration",
+    description="Toggle authentication requirement. Requires admin access.",
+    operation_id="update_auth_config_admin_config_auth_put",
+    responses={200: {"description": "Successful Response"}},
+)
+async def update_auth_config(
+    enabled: bool = Form(..., title="Enabled"),
+    db: Session = Depends(get_db),
+    user: UserPayload | None = Depends(require_admin),
+) -> dict[str, bool | str]:
+    """Update authentication configuration.
+
+    Requires admin access. Changes are persistent and take effect immediately.
+    """
+    from .config_service import ConfigService
+
+    config_service = ConfigService(db)
+
+    # Get user ID from JWT
+    user_id = user.id if user else None
+
+    # Update configuration
+    config_service.set_auth_enabled(enabled, user_id)
+
+    return {
+        "auth_enabled": enabled,
+        "message": "Configuration updated successfully",
+    }

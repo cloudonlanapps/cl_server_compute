@@ -123,7 +123,7 @@ def check_tables_exist() -> None:
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
 
-    required_tables = ["jobs", "queue_entries", "alembic_version"]
+    required_tables = ["jobs", "queue_entries", "service_config", "alembic_version"]
 
     missing_tables = [table for table in required_tables if table not in existing_tables]
 

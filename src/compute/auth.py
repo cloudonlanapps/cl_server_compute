@@ -9,6 +9,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from sqlalchemy.orm import Session
+
+from .database import get_db
 
 # ─────────────────────────────────────
 # Permissions
@@ -102,10 +105,14 @@ async def get_public_key() -> str:
 
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> UserPayload | None:
     """Validate the JWT and return the user payload."""
 
-    if Config.AUTH_DISABLED:
+    from .config_service import ConfigService
+
+    config_service = ConfigService(db)
+    if not config_service.get_auth_enabled():  # auth_enabled=false → guest mode ON
         return None
 
     if token is None:
@@ -154,8 +161,12 @@ def require_permission(permission: Permission):
 
     async def permission_checker(
         current_user: UserPayload | None = Depends(get_current_user),
+        db: Session = Depends(get_db),
     ) -> UserPayload | None:
-        if Config.AUTH_DISABLED:
+        from .config_service import ConfigService
+
+        config_service = ConfigService(db)
+        if not config_service.get_auth_enabled():  # auth_enabled=false → guest mode ON
             return current_user
 
         if current_user is None:
@@ -181,8 +192,12 @@ def require_permission(permission: Permission):
 
 async def require_admin(
     current_user: UserPayload | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> UserPayload | None:
-    if Config.AUTH_DISABLED:
+    from .config_service import ConfigService
+
+    config_service = ConfigService(db)
+    if not config_service.get_auth_enabled():  # auth_enabled=false → guest mode ON
         return current_user
 
     if current_user is None:

@@ -4,9 +4,11 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
+from .database import get_db
 from .plugins import create_compute_plugin_router
 from .routes import router
 from .schemas import RootResponse
@@ -62,11 +64,17 @@ async def validation_exception_handler(_request: Request, exc: HTTPException):
     response_model=RootResponse,
     operation_id="root_get",
 )
-async def root():
-    auth_required = os.getenv("AUTH_DISABLED", "false").lower() != "true"
+async def root(db: Session = Depends(get_db)):
+    from .config_service import ConfigService
+
+    config_service = ConfigService(db)
+    auth_enabled = config_service.get_auth_enabled()
+    guest_mode = "off" if auth_enabled else "on"
+
     return RootResponse(
         status="healthy",
         service="Task Server",
         version="v1",
-        auth_required=auth_required,
+        auth_required=auth_enabled,
+        guestMode=guest_mode,
     )
