@@ -35,8 +35,8 @@ compute-server = "compute.compute_server:main"
 compute-worker = "compute.compute_worker:main"
 
 [tool.uv.sources]
-cl-ml-tools = { path = "../packages/cl_ml_tools", editable = true }
-cl-server-shared = { path = "../shared", editable = true }
+cl-ml-tools = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git", rev = "main"  }
+cl-server-shared = { git = "https://github.com/cloudonlanapps/cl_server_shared.git", rev = "main" }
 
 # Plugin Registration
 # Compute task plugins are auto-discovered from entry points.
