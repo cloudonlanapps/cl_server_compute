@@ -19,8 +19,8 @@ classifiers = [
 dependencies = [
     "alembic>=1.17.2",
     "basedpyright>=1.36.2",
-    "cl-ml-tools",
-    "cl-server-shared",
+    "cl-ml-tools @ git+https://github.com/cloudonlanapps/cl_ml_tools.git@main",
+    "cl-server-shared @ git+https://github.com/cloudonlanapps/cl_server_shared.git@main",
     "fastapi>=0.127.0",
     "pydantic>=2.12.5",
     "pytest-cov[dev]>=7.0.0",
@@ -34,9 +34,6 @@ compute-migrate = "compute.migrate:main"
 compute-server = "compute.compute_server:main"
 compute-worker = "compute.compute_worker:main"
 
-[tool.uv.sources]
-cl-ml-tools = { git = "https://github.com/cloudonlanapps/cl_ml_tools.git", rev = "main"  }
-cl-server-shared = { git = "https://github.com/cloudonlanapps/cl_server_shared.git", rev = "main" }
 
 # Plugin Registration
 # Compute task plugins are auto-discovered from entry points.
