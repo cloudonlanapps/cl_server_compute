@@ -75,6 +75,5 @@ async def root(db: Session = Depends(get_db)):
         status="healthy",
         service="Task Server",
         version="v1",
-        auth_required=auth_enabled,
         guestMode=guest_mode,
     )

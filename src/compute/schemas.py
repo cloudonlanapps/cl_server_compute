@@ -64,7 +64,7 @@ class WorkerCapabilitiesResponse(BaseModel):
 class ConfigResponse(BaseModel):
     """Response schema for configuration endpoints."""
 
-    auth_enabled: bool = Field(..., description="Whether authentication is enabled")
+    guest_mode: bool = Field(..., description="Whether guest mode is enabled (true = no authentication required)")
     updated_at: int | None = Field(None, description="Timestamp of last update (milliseconds)")
     updated_by: str | None = Field(None, description="User ID who last updated the config")
 
@@ -75,5 +75,4 @@ class RootResponse(BaseModel):
     status: str = Field(..., description="Health status")
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
-    auth_required: bool = Field(..., description="Whether authentication is required")
     guestMode: str = Field(..., description="Guest mode status (on/off)")
