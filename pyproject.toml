@@ -23,7 +23,6 @@ dependencies = [
     "cl-server-shared @ git+https://github.com/cloudonlanapps/cl_server_shared.git@main",
     "fastapi>=0.127.0",
     "pydantic>=2.12.5",
-    "pytest-cov[dev]>=7.0.0",
     "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.45",
     "uvicorn>=0.40.0",
