@@ -1,7 +1,6 @@
 """Task Server - Compute job and worker management service."""
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
